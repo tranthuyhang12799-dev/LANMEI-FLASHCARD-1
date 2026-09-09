@@ -23,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- HanziWriter JS for Stroke Order Animation & Guided Writing Practice -->
     <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
-    <!-- [HỘI THOẠI] Thư viện chuyển chữ Hán -> Pinyin, dùng để hiện/ẩn pinyin trong phần Hội Thoại -->
+    <!-- [HỘI THOẠI] Thư viện chuyển chữ Hán -> Phiên âm, dùng để hiện/ẩn phiên âm trong phần Hội Thoại -->
     <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.18.2/dist/index.js"></script>
 
     <!-- ═══════════════════════════════════════════════════════════════
@@ -84,6 +84,17 @@
          [MÀU SẮC - THEME] bên dưới, không sửa ở đây.
          ═══════════════════════════════════════════════════════════════ -->
     <style>
+        /* [CHỐNG KÉO TRÔI HEADER] Trên điện thoại (đặc biệt Safari iOS), khi kéo
+           quá đỉnh trang (pull-to-refresh / rubber-band) toàn bộ trang bị co giãn
+           đàn hồi, kéo theo cả header đang "sticky" trôi xuống theo. Tắt hiệu ứng
+           đàn hồi này để header luôn đứng yên tại chỗ, không bị kéo lên/xuống được. */
+        html, body {
+            overscroll-behavior-y: none;
+        }
+        header.sticky {
+            overscroll-behavior: none;
+        }
+
         /* 3D Card Flip Animation */
         .perspective-1000 {
             perspective: 1000px;
@@ -142,6 +153,29 @@
             box-shadow: 0 10px 25px -5px rgba(220, 38, 38, 0.15);
         }
 
+
+        /* [CỠ CHỮ] Khi font-size được set lên #view-container, các class text-* của Tailwind
+           vẫn dùng rem (gốc từ html). Override lại để dùng em (tương đối với #view-container)
+           chỉ cho nội dung thẻ nhớ, không ảnh hưởng layout/padding/height bên ngoài. */
+        #view-container { --fc-scale: 1; }
+        #mode-flashcard #card-hanzi       { font-size: clamp(2rem, 4em, 5rem); }
+        #mode-flashcard #card-pinyin      { font-size: clamp(1.1rem, 1.6em, 2rem); }
+        #mode-flashcard #card-back-hanzi  { font-size: clamp(1.6rem, 3em, 4rem); }
+        #mode-flashcard #card-back-pinyin { font-size: clamp(0.95rem, 1.3em, 1.6rem); }
+        #mode-flashcard #card-meaning     { font-size: clamp(1.2rem, 1.8em, 2.5rem); }
+        #mode-flashcard #card-example-cn  { font-size: clamp(0.85rem, 1.1em, 1.2rem); }
+        #mode-flashcard #card-example-pinyin,
+        #mode-flashcard #card-example-vi  { font-size: clamp(0.75rem, 0.95em, 1rem); }
+        #mode-flashcard #card-wordtype,
+        #mode-flashcard #card-hanviet,
+        #mode-flashcard #card-back-wordtype,
+        #mode-flashcard #card-back-hanviet { font-size: clamp(0.7rem, 0.85em, 0.9rem); }
+        /* [CỠ CHỮ] Áp dụng tương tự cho nội dung Hội Thoại */
+        #dialogue-content .font-hanzi            { font-size: clamp(1rem, 1.35em, 1.75rem); }
+        #dialogue-content .dialogue-pinyin-line  { font-size: clamp(0.7rem, 0.95em, 1.05rem); }
+        #dialogue-content .dialogue-meaning-line { font-size: clamp(0.7rem, 0.95em, 1.05rem); }
+        #dialogue-content .dialogue-speaker-line { font-size: clamp(0.65rem, 0.75em, 0.85rem); }
+        #dialogue-content .dialogue-context-meaning { font-size: clamp(0.85rem, 1.1em, 1.25rem); }
         /* Style riêng cho khối chữ Hán trong game Sắp Xếp Câu */
         .so-token-btn {
             touch-action: manipulation;
@@ -243,37 +277,144 @@
            khiến justify-content: center tạo khoảng trống lớn phía trên, giữa thanh
            chọn HSK và thẻ flashcard). Trên desktop vẫn giữ căn giữa như cũ. */
         @media (max-width: 767px) {
+            /* main & view-container: xóa padding, fill toàn màn hình */
+            #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+                padding: 0 !important;
+                gap: 0 !important;
+            }
             #view-container:has(#mode-flashcard:not(.hidden)) {
                 justify-content: flex-start;
+                background-image: inherit;
+                background-size: cover !important;
+                background-position: center !important;
+                background-repeat: no-repeat !important;
+            }
+            /* Flashcard section: bỏ background/border-radius/padding riêng */
+            #mode-flashcard {
+                max-width: 100% !important;
+                background: transparent !important;
+                background-image: none !important;
+                border-radius: 0 !important;
+                padding: 4px 16px 12px !important;
+                gap: 22px !important;
+            }
+            /* Toolbar: phóng to các nút, sát lên trên */
+            #mode-flashcard > div:first-child {
+                padding: 6px 4px 2px !important;
+                margin-top: 0 !important;
+            }
+            /* [FIX] :not(#hsk-dropdown-panel button) — loại trừ các nút BÊN TRONG
+               panel dropdown "HSK..." (Từ vựng HSK, HSK 1-6, Giáo trình HSK 3.0...).
+               Trước đây rule này ép MỌI button trong thanh công cụ (kể cả các nút
+               đã bị JS chuyển vào #flashcard-mobile-sotay-slot nằm trong div này)
+               còn đúng 36x36px, khiến chữ trong panel dropdown bị dồn/đè lên nhau. */
+            #mode-flashcard > div:first-child button:not(#hsk-dropdown-panel button):not(#lesson-dropdown-btn):not(#lesson-dropdown-panel button) {
+                width: 36px !important;
+                height: 36px !important;
+            }
+            #mode-flashcard > div:first-child button:not(#hsk-dropdown-panel button):not(#lesson-dropdown-btn):not(#lesson-dropdown-panel button) i {
+                font-size: 1rem !important;
+            }
+            #mode-flashcard > div:first-child button:not(#hsk-dropdown-panel button):not(#lesson-dropdown-btn):not(#lesson-dropdown-panel button):last-of-type {
+                font-size: 1.1rem !important;
+            }
+            /* HSK dropdown trong toolbar cũng to hơn — CHỈ áp cho nút bấm chính
+               ("HSK 1 ⌄"), không áp cho các nút bên trong panel khi mở ra. */
+            #flashcard-mobile-sotay-slot #hsk-dropdown-btn {
+                height: 36px !important;
+                font-size: 0.82rem !important;
+                padding: 0 10px !important;
+            }
+            /* [FIX] Nút "Tất cả bài" / tên bài đứng cạnh nút HSK trên di động dễ
+               bị tràn/xuống dòng vì 2 nút chia nhau không gian hẹp — giảm cỡ chữ
+               và padding một chút để chữ luôn nằm gọn 1 hàng. Cỡ chữ đồng bộ với
+               nút HSK bên cạnh để 2 nút trông cân đối, không lệch cỡ. */
+            #flashcard-mobile-sotay-slot #lesson-dropdown-btn {
+                width: auto !important;
+                flex-shrink: 0 !important;
+                height: 36px !important;
+                font-size: 0.82rem !important;
+                padding: 0 10px !important;
+                min-width: 0 !important;
+                gap: 4px !important;
+            }
+            /* Nội dung bên trong thẻ cuộn được nếu cỡ chữ lớn */
+            #flashcard-inner > div {
+                overflow-y: auto;
             }
         }
 
-        /* Trên mobile: ẩn thanh chọn Sổ Tay (HSK) khi đang ở Trang Chủ.
-           Thanh này chỉ cần hiện lại khi vào các chế độ học khác (Thẻ Nhớ, Bài Tập...) */
+        /* Trên mobile: ẩn thanh chọn Sổ Tay (HSK) khi đang ở Trang Chủ, Hội Thoại,
+           Thẻ Nhớ, Bài Tập, hoặc Tra Từ — khối chọn Sổ tay (nếu có) đã được JS
+           chuyển xuống nằm cạnh nút cài đặt (⚙️) trong Thẻ nhớ, còn ở các chế độ
+           khác thanh này vốn không có nội dung gì cho di động, chỉ còn là 1
+           khoảng trống rỗng phía trên, không còn tác dụng gì. */
         @media (max-width: 767px) {
             #top-filter-bar:has(~ #view-container #mode-home:not(.hidden)),
-            #top-filter-bar:has(~ #view-container #mode-dialogue:not(.hidden)) {
+            #top-filter-bar:has(~ #view-container #mode-dialogue:not(.hidden)),
+            #top-filter-bar:has(~ #view-container #mode-flashcard:not(.hidden)),
+            #top-filter-bar:has(~ #view-container #mode-exercises:not(.hidden)),
+            #top-filter-bar:has(~ #view-container #mode-dictionary:not(.hidden)),
+            #top-filter-bar:has(~ #view-container #mode-grammar:not(.hidden)) {
                 display: none;
+            }
+            /* Khi filter bar ẩn → xoá padding-top và gap thừa ở main */
+            #app-main-content:has(#view-container #mode-home:not(.hidden)),
+            #app-main-content:has(#view-container #mode-dialogue:not(.hidden)),
+            #app-main-content:has(#view-container #mode-flashcard:not(.hidden)),
+            #app-main-content:has(#view-container #mode-exercises:not(.hidden)),
+            #app-main-content:has(#view-container #mode-dictionary:not(.hidden)),
+            #app-main-content:has(#view-container #mode-grammar:not(.hidden)) {
+                padding-top: 0;
+                gap: 0;
+            }
+            /* Riêng Hội Thoại: thu hẹp padding ngang của main + khung nội dung
+               để tận dụng tối đa chiều rộng màn hình di động (đỡ dư khoảng trống). */
+            #app-main-content:has(#view-container #mode-dialogue:not(.hidden)) {
+                padding-left: 8px;
+                padding-right: 8px;
+            }
+            #dialogue-content {
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+            }
+            /* Cố định khối tiêu đề + chọn HSK/Bài + tab con của Hội Thoại ngay dưới
+               header chính khi cuộn trên điện thoại, để không bị kéo trôi lên xuống
+               theo nội dung hội thoại bên dưới. */
+            #dialogue-sticky-bar {
+                position: sticky;
+                top: 5rem; /* = chiều cao header chính (h-20) */
+                z-index: 30;
+                margin-left: -8px;
+                margin-right: -8px;
+                padding: 10px 8px 8px;
+                border-bottom: 1px solid rgba(2, 132, 199, 0.12);
+                box-shadow: 0 6px 12px -8px rgba(2, 132, 199, 0.18);
             }
         }
     
-/* ===== GRAMMAR MODAL OVERLAY ===== */
-#grammar-modal-overlay {
+/* Hội Thoại đã có sẵn 2 ô chọn "HSK.../Bài..." riêng ngay trong màn hình,
+   nên ẩn khối chọn Sổ tay chung ở thanh filter phía trên đi cho đỡ dư thừa
+   (áp dụng mọi kích thước màn hình, không chỉ di động). */
+body:has(#view-container #mode-dialogue:not(.hidden)) #sotay-selector-block {
     display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    overflow: hidden;
 }
-#grammar-modal-overlay.active {
-    display: block;
+
+/* Riêng khối Thẻ Nhớ TRÊN ĐIỆN THOẠI: hiển thị chữ Hán bằng font 楷体_GB2312
+   (KaiTi_GB2312). Trên desktop (>= 768px) dùng font Kaiti SC. */
+@media (max-width: 767px) {
+    #card-hanzi, #card-back-hanzi, #card-example-cn {
+        font-family: '楷体_GB2312', 'KaiTi_GB2312', 'KaiTi', 'STKaiti', 'Kaiti SC', serif;
+    }
 }
-#grammar-modal-inner {
-    position: absolute;
-    inset: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+@media (min-width: 768px) {
+    #card-hanzi, #card-back-hanzi, #card-example-cn {
+        font-family: 'SimSun', 'SimSun-ExtB', serif;
+    }
 }
+
+/* ===== GRAMMAR SECTION (hiển thị như 1 khối study-mode bình thường,
+   giống "Thẻ Nhớ" / "Bài Tập" — không còn là modal/overlay nổi) ===== */
 
 /* ---- Scoped Ngu Phap styles ---- */
 
@@ -297,9 +438,9 @@
     background:var(--paper);
     color:var(--ink);
     font-family:'Be Vietnam Pro', sans-serif;
-    min-height:100vh;
-    overflow-x:hidden;
-    max-width:100vw;
+    width:100%;
+    border-radius:1.5rem;
+    overflow:hidden;
     background-image:
       radial-gradient(circle at 15% 8%, rgba(2,132,199,0.05), transparent 40%),
       radial-gradient(circle at 90% 85%, rgba(56,189,248,0.06), transparent 45%);
@@ -933,34 +1074,6 @@
     *{ transition:none !important; scroll-behavior:auto !important;}
   }
 
-
-/* ---- Close button ---- */
-#grammar-close-btn {
-    position: fixed;
-    top: 14px;
-    right: 18px;
-    z-index: 10001;
-    background: #0284C7;
-    color: #FFFFFF;
-    border: none;
-    border-radius: 50%;
-    width: 44px;
-    height: 44px;
-    font-size: 22px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 20px rgba(2,132,199,0.45);
-    transition: background 0.18s, transform 0.15s;
-    line-height: 1;
-    font-family: sans-serif;
-}
-#grammar-close-btn:hover {
-    background: #075985;
-    transform: scale(1.08);
-}
-
     </style>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -1037,6 +1150,7 @@
   @media (max-width: 1024px) {
     html[data-theme="mint"] #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #D4EDD4 !important;
     }
   }
@@ -1126,6 +1240,7 @@
   @media (max-width: 1024px) {
     html[data-theme="mudan"] #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #fee2e2 !important;
     }
   }
@@ -1237,6 +1352,7 @@
   @media (max-width: 1024px) {
     html:not([data-theme]) #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #e0f2fe !important;
     }
   }
@@ -1284,6 +1400,7 @@
   @media (max-width: 1024px) {
     html[data-theme="baihe"] #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #ffedd5 !important;
     }
   }
@@ -1410,6 +1527,7 @@
   @media (max-width: 1024px) {
     html[data-theme="huangju"] #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #fefce8 !important;
     }
   }
@@ -1536,6 +1654,7 @@
   @media (max-width: 1024px) {
     html[data-theme="xunyicao"] #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #f5f3ff !important;
     }
   }
@@ -1662,6 +1781,7 @@
   @media (max-width: 1024px) {
     html[data-theme="meigui"] #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #f1f5f9 !important;
     }
   }
@@ -1894,6 +2014,7 @@
   @media (max-width: 1024px) {
     html[data-theme="lotus"] #mode-home {
       background-size: contain !important;
+      background-repeat: repeat-y !important;
       background-color: #f8bbd0 !important;
     }
   }
@@ -2003,7 +2124,98 @@
      Đặt cuối cùng trong khối theme để thắng các rule !important ở trên
      (cùng độ ưu tiên CSS, quy tắc nào đứng sau sẽ được áp dụng).
      ═══════════════════════════════════════════════════════════════════ */
-  html.hide-bg-pattern #mode-home,
+  html.hide-bg-pattern #mode-home {
+    background-image: none !important;
+  }
+  /* Trên mobile/tablet (≤1024px), mỗi theme còn có background-color riêng để
+     lấp khoảng trống khi background-size chuyển sang "contain" (xem các khối
+     "Trang chủ trên iPad/điện thoại" phía trên). Khi bật "Xóa hoa văn nền",
+     phải xoá luôn màu lấp khoảng trống này, nếu không sẽ còn sót một lớp màu
+     phủ kín #mode-home dù ảnh nền đã bị gỡ. Đặt sau tất cả các rule
+     background-color của từng theme (cùng độ đặc hiệu CSS) để thắng chúng. */
+  @media (max-width: 1024px) {
+    html.hide-bg-pattern #mode-home {
+      background-color: transparent !important;
+    }
+  }
+
+/* [MOBILE FLASHCARD] Trên mobile, kéo nền hoa lên app-main-content để phủ kín toàn màn hình */
+  @media (max-width: 767px) {
+    html[data-theme="mint"] #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen xanh.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+  @media (max-width: 767px) {
+    html[data-theme="mudan"] #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen do.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+  @media (max-width: 767px) {
+    html:not([data-theme]) #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen lam.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+  @media (max-width: 767px) {
+    html[data-theme="baihe"] #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen lam.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+  @media (max-width: 767px) {
+    html[data-theme="huangju"] #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen cam.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+  @media (max-width: 767px) {
+    html[data-theme="xunyicao"] #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen tim.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+  @media (max-width: 767px) {
+    html[data-theme="meigui"] #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen trang.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+  @media (max-width: 767px) {
+    html[data-theme="lotus"] #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)), url('nen hong.png') !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+  }
+
+  /* Riêng Thẻ Nhớ trên mobile (≤767px): ảnh hoa văn được gắn vào #app-main-content
+     (xem khối "[MOBILE FLASHCARD]" phía trên) chứ không phải #mode-flashcard, nên
+     rule "Xóa hoa văn nền" bên dưới (chỉ target #mode-flashcard) không xoá được nó.
+     Thêm rule riêng target đúng #app-main-content, giữ cùng độ đặc hiệu CSS
+     (3 id + 2 class) như 8 rule theo từng theme ở trên và đặt SAU chúng để thắng. */
+  @media (max-width: 767px) {
+    html.hide-bg-pattern #app-main-content:has(#view-container #mode-flashcard:not(.hidden)) {
+      background-image: none !important;
+    }
+  }
+
   html.hide-bg-pattern #mode-flashcard,
   html.hide-bg-pattern #mode-exercises,
   html.hide-bg-pattern #mode-quiz,
@@ -2028,7 +2240,11 @@
 <body class="bg-soft-gradient text-brand-950 font-sans min-h-screen flex flex-col selection:bg-accent-200 selection:text-accent-800">
 
     <!-- Màn hình đăng nhập / loading / từ chối -->
-    <!-- ĐÃ TẠM ẨN: bỏ qua bước đăng nhập Firebase vì thiếu file firebase-sync.js -->
+    <!-- Màn hình chắn đăng nhập (auth-gate) này KHÔNG được dùng vì đăng nhập Google
+         hiện là TÙY CHỌN — ai không đăng nhập vẫn dùng app bình thường (dữ liệu lưu
+         trên máy). Đăng nhập chỉ cần thiết nếu muốn hiện tên trên Bảng Xếp Hạng
+         (xem #settings-google-login-btn trong popup Cài Đặt). Chừa lại HTML này
+         phòng khi sau này muốn bật đăng nhập bắt buộc. -->
     <div id="auth-gate" style="display:none" class="fixed inset-0 z-50 bg-soft-gradient flex items-center justify-center">
         <!-- Loading -->
         <div id="auth-gate-loading" class="flex flex-col items-center gap-4 text-brand-700">
@@ -2145,6 +2361,51 @@
 
                 <!-- Action Buttons -->
                 <div class="flex items-center gap-2">
+                    <!-- Nút Cài đặt -->
+                    <div class="relative" id="settings-wrapper">
+                        <button type="button" id="settings-btn"
+                            title="Cài đặt"
+                            class="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-white/80 border border-brand-200 shadow-sm hover:bg-brand-50 transition text-brand-700 font-bold text-sm">
+                            <i class="fa-solid fa-gear"></i>
+                            <span class="hidden sm:inline">Cài đặt</span>
+                        </button>
+                        <div id="settings-panel" class="hidden fixed z-[999] bg-white border border-brand-200 rounded-2xl shadow-xl p-4 flex flex-col gap-3 min-w-[200px]">
+
+                            <!-- Cỡ chữ -->
+                            <div>
+                                <p class="text-[11px] font-bold text-brand-400 uppercase tracking-wide px-1 mb-1.5">Cỡ chữ</p>
+                                <div class="flex gap-1.5">
+                                    <button type="button" class="font-size-option flex-1 py-2 rounded-xl text-sm font-semibold transition border border-brand-200 hover:bg-brand-50 text-brand-800 text-center" data-size="small">A<span class="text-[10px]">nhỏ</span></button>
+                                    <button type="button" class="font-size-option flex-1 py-2 rounded-xl text-sm font-semibold transition border border-brand-200 hover:bg-brand-50 text-brand-800 text-center" data-size="medium">A<span class="text-xs">vừa</span></button>
+                                    <button type="button" class="font-size-option flex-1 py-2 rounded-xl text-sm font-semibold transition border border-brand-200 hover:bg-brand-50 text-brand-800 text-center" data-size="large">A<span class="text-sm">to</span></button>
+                                </div>
+                            </div>
+
+                            <hr class="border-brand-100">
+
+                            <!-- Đăng nhập Google -->
+                            <div id="settings-auth-section">
+                                <p class="text-[11px] font-bold text-brand-400 uppercase tracking-wide px-1 mb-1.5">Tài khoản</p>
+                                <!-- Chưa đăng nhập -->
+                                <div id="settings-login-area">
+                                    <button type="button" id="settings-google-login-btn"
+                                        class="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-white border border-brand-200 hover:border-brand-400 rounded-xl font-semibold text-sm text-brand-800 transition shadow-sm hover:shadow-md">
+                                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-4 h-4">
+                                        Đăng nhập bằng Gmail
+                                    </button>
+                                </div>
+                                <!-- Đã đăng nhập -->
+                                <div id="settings-user-area" class="hidden flex items-center gap-2">
+                                    <img id="settings-user-avatar" src="" class="w-7 h-7 rounded-full object-cover border border-brand-200">
+                                    <span id="settings-user-name" class="text-sm font-semibold text-brand-800 flex-1 truncate"></span>
+                                    <button type="button" id="settings-logout-btn" class="text-xs text-brand-400 hover:text-rose-500 transition" title="Đăng xuất">
+                                        <i class="fa-solid fa-right-from-bracket"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2177,7 +2438,7 @@
             <i class="fa-solid fa-comments"></i>
             <span>Hội Thoại</span>
         </button>
-        <button type="button" id="btn-open-grammar-modal-mobile" class="bottom-tab-btn btn-open-grammar-modal-trigger" title="Ngữ Pháp">
+        <button type="button" id="btn-open-grammar-modal-mobile" data-mode="grammar" class="bottom-tab-btn" title="Ngữ Pháp">
             <i class="fa-solid fa-book-open"></i>
             <span>Ngữ Pháp</span>
         </button>
@@ -2212,17 +2473,17 @@
                     <span>Hội Thoại</span>
                 </button>
 
-                <button id="btn-open-grammar-modal" class="btn-open-grammar-modal-trigger px-3.5 py-2 rounded-xl text-sm font-semibold text-brand-800/70 hover:text-brand-900 hover:bg-brand-50 transition flex items-center gap-2 whitespace-nowrap" title="Mở bảng Ngữ pháp tiếng Trung">
+                <button type="button" id="btn-open-grammar-modal" data-mode="grammar" class="tab-btn px-3.5 py-2 rounded-xl text-sm font-semibold text-brand-800/70 hover:text-brand-900 hover:bg-brand-50 transition flex items-center gap-2 whitespace-nowrap" title="Mở bảng Ngữ pháp tiếng Trung">
                     <i class="fa-solid fa-book-open"></i>
                     <span>Ngữ Pháp</span>
                 </button>
             </div>
 
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2" id="sotay-selector-block">
                 <span class="text-xs font-bold text-brand-800 uppercase tracking-wider hidden sm:inline">Sổ tay:</span>
                 <div class="relative" id="hsk-dropdown-wrapper">
                     <button type="button" id="hsk-dropdown-btn" class="bg-brand-50 border border-brand-200 text-brand-950 text-sm font-medium rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer w-auto min-w-[110px] flex items-center justify-between gap-2">
-                        <span id="hsk-dropdown-label">HSK 1</span>
+                        <span id="hsk-dropdown-label" class="whitespace-nowrap">HSK 1</span>
                         <i class="fa-solid fa-chevron-down text-xs text-brand-400"></i>
                     </button>
                     <div id="hsk-dropdown-panel" class="hidden absolute left-0 z-30 mt-1.5 w-64 bg-white border border-brand-200 rounded-xl shadow-lg py-1.5 max-h-80 overflow-y-auto">
@@ -2279,7 +2540,7 @@
                 </div>
                 <div class="relative hidden" id="lesson-dropdown-wrapper">
                     <button type="button" id="lesson-dropdown-btn" class="bg-brand-50 border border-brand-200 text-brand-950 text-sm font-medium rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer w-full sm:w-auto min-w-[110px] flex items-center justify-between gap-2">
-                        <span id="lesson-dropdown-label">Tất cả bài</span>
+                        <span id="lesson-dropdown-label" class="whitespace-nowrap">Tất cả bài</span>
                         <i class="fa-solid fa-chevron-down text-xs text-brand-400"></i>
                     </button>
                     <div id="lesson-dropdown-panel" class="hidden absolute left-0 z-30 mt-1.5 w-40 bg-white border border-brand-200 rounded-xl shadow-lg py-1.5 max-h-80 overflow-y-auto">
@@ -2287,6 +2548,12 @@
                     </div>
                 </div>
             </div>
+
+            <!-- [HỘI THOẠI - DESKTOP] Chỗ chứa 2 ô "HSK.../Bài..." của Hội Thoại khi dùng
+                 màn hình rộng (md+) — JS sẽ chuyển #dialogue-selector-group vào đây thay vì
+                 để nó nằm ở hàng tiêu đề bên trong màn Hội Thoại. Trống/không chiếm diện tích
+                 khi không ở chế độ Hội Thoại. -->
+            <div class="hidden md:flex items-center gap-2" id="dialogue-desktop-selector-slot"></div>
         </div>
 
         <div id="view-container" class="flex-grow flex flex-col justify-center">
@@ -2301,9 +2568,11 @@
                     <div class="absolute top-6 right-32 text-2xl opacity-15 select-none">🫐</div>
 
                     <div class="flex-1 z-10">
-                        <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-950 leading-tight mb-3">
-                            Học Tiếng Trung cùng LanMei!
-                        </h2>
+                        <div class="flex items-start gap-2 mb-3">
+                            <h2 class="text-3xl sm:text-4xl font-extrabold text-brand-950 leading-tight flex-1">
+                                Cùng nhau chinh phục tiếng Trung nhé! 🎯
+                            </h2>
+                        </div>
                     </div>
                     <div class="w-full sm:w-72 lg:w-96 flex-shrink-0 z-10">
                         <img id="hero-image" src="hinhtrangchu.png" alt="LanMei" class="w-full rounded-2xl object-cover shadow-md" onerror="this.style.display='none'">
@@ -2319,7 +2588,7 @@
                     </div>
                     <div class="relative w-full max-w-xl">
                         <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-brand-400"></i>
-                        <input type="text" id="home-search-input" placeholder="Nhập Hán tự, Pinyin hoặc nghĩa..." class="w-full bg-white border border-brand-200 rounded-full pl-11 pr-11 py-3 text-sm text-brand-950 placeholder-brand-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <input type="text" id="home-search-input" placeholder="Nhập Hán tự, Phiên âm hoặc nghĩa..." class="w-full bg-white border border-brand-200 rounded-full pl-11 pr-11 py-3 text-sm text-brand-950 placeholder-brand-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
                         <button type="button" id="home-search-speak" title="Nghe phát âm nội dung đang gõ" class="absolute right-4 top-1/2 -translate-y-1/2 text-brand-400 hover:text-brand-600 transition">
                             <i class="fa-solid fa-volume-high"></i>
                         </button>
@@ -2459,9 +2728,11 @@
                                     <span class="text-[11px] font-bold text-brand-700 uppercase tracking-wide" id="home-daily-score-label">Điểm tích lũy hôm nay</span>
                                     <span class="text-lg font-extrabold text-brand-950"><span id="home-daily-score">0</span> điểm</span>
                                 </div>
+                                <div class="col-span-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-col gap-1">
+                                    <span class="text-[11px] font-bold text-amber-700 uppercase tracking-wide">Từ đã thuộc</span>
+                                    <span class="text-lg font-extrabold text-amber-900"><span id="home-mastered-total-box">0</span> từ</span>
+                                </div>
                             </div>
-
-                            <p class="text-[11px] text-brand-400 text-center">Tổng cộng đã thuộc <span id="home-mastered-count">0</span>/<span id="home-vocab-total">0</span> từ vựng</p>
 
                         </div>
 
@@ -2479,14 +2750,8 @@
                 
                 <div class="flex justify-between w-full text-xs font-semibold text-brand-800 px-1">
                     <div class="flex items-center gap-2">
-                        <div class="flex items-center gap-1 bg-brand-50 border border-brand-200 rounded-full p-0.5">
-                            <button id="btn-voice-male" title="Nữ 1 (Phổ thông)" class="w-7 h-7 flex items-center justify-center rounded-full text-sm transition">
-                                👩
-                            </button>
-                            <button id="btn-voice-female" title="Nữ 2 (Phổ thông)" class="w-7 h-7 flex items-center justify-center rounded-full text-sm transition">
-                                👧
-                            </button>
-                        </div>
+                        <button id="btn-voice-male" class="hidden"></button>
+                        <button id="btn-voice-female" class="hidden"></button>
                         <button id="btn-record-pronunciation" class="w-7 h-7 flex items-center justify-center rounded-full bg-brand-50 hover:bg-rose-50 border border-brand-200 text-slate-400 hover:text-rose-500 transition" title="Ghi âm chấm điểm phát âm">
                             <i id="btn-record-pronunciation-icon" class="fa-solid fa-microphone text-sm"></i>
                         </button>
@@ -2504,10 +2769,11 @@
                         <button id="btn-open-settings-modal" class="w-7 h-7 flex items-center justify-center rounded-full bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-600 transition" title="Cài đặt hiển thị Thẻ nhớ">
                             <i class="fa-solid fa-gear text-xs"></i>
                         </button>
+                        <div id="flashcard-mobile-sotay-slot" class="md:hidden"></div>
                     </div>
                 </div>
 
-                <div class="perspective-1000 w-full h-[min(62svh,380px)] sm:h-[420px] cursor-pointer group relative" id="flashcard-element">
+                <div class="perspective-1000 w-full h-[min(72svh,420px)] sm:h-[420px] cursor-pointer group relative" id="flashcard-element">
                     <span id="card-seq-badge" class="absolute -top-3.5 left-1/2 -translate-x-1/2 z-20 bg-white border border-brand-300 text-brand-700 text-xs font-bold px-3.5 py-1 rounded-full shadow-sm cursor-pointer hover:border-brand-500 hover:bg-brand-50 transition select-none" title="Click để nhập số trang">
                         1
                     </span>
@@ -2614,8 +2880,13 @@
             <section id="mode-exercises" class="study-mode hidden flex flex-col max-w-2xl mx-auto w-full gap-5">
                 <div class="text-center">
                     <h2 class="font-extrabold text-slate-800 text-xl sm:text-2xl">📝 Bài Tập</h2>
-                    <p class="text-sm text-slate-500 mt-1">Chọn một bài tập để bắt đầu luyện tập</p>
                 </div>
+
+                <!-- [SỔ TAY - MOBILE, BÀI TẬP] Trên điện thoại (< md), JS sẽ chuyển
+                     khối chọn Sổ tay (HSK.../Bài...) vào đây khi đang ở màn hub Bài
+                     Tập, để người dùng lọc được HSK/Bài trước khi vào Trắc Nghiệm,
+                     Nghe, Dịch hay Sắp Xếp Câu. Xem script [SỔ TAY - MOBILE]. -->
+                <div id="exercises-mobile-sotay-slot" class="md:hidden flex justify-center"></div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <button data-mode="quiz" class="exercise-hub-card group bg-white hover:bg-brand-50 border border-brand-200 rounded-2xl p-5 flex flex-col items-center gap-2 transition shadow-xs">
@@ -2876,7 +3147,7 @@
                         <div id="so-feedback" class="hidden w-full p-3.5 rounded-xl font-bold text-sm text-center"></div>
 
                         <div class="flex flex-wrap items-center justify-center gap-2 w-full pt-1">
-                            <button id="soCheck" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition flex items-center gap-1.5 shadow-md shadow-teal-600/20">
+                            <button id="soCheck" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white transition flex items-center gap-1.5 shadow-md shadow-teal-600/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-teal-600">
                                 <i class="fa-solid fa-check"></i>
                                 <span>Kiểm tra</span>
                             </button>
@@ -2897,7 +3168,7 @@
                 <div class="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white p-4 rounded-2xl border border-brand-200 shadow-xs">
                     <div class="relative w-full sm:w-80">
                         <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-brand-400"></i>
-                        <input type="text" id="dict-search-input" placeholder="Tìm theo Hán tự, Pinyin, Nghĩa..." class="w-full bg-brand-50 border border-brand-200 rounded-xl pl-10 pr-4 py-2 text-sm text-brand-950 placeholder-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                        <input type="text" id="dict-search-input" placeholder="Tìm theo Hán tự, Phiên âm, Nghĩa..." class="w-full bg-brand-50 border border-brand-200 rounded-xl pl-10 pr-4 py-2 text-sm text-brand-950 placeholder-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
                     </div>
 
                     <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end flex-wrap">
@@ -2913,7 +3184,7 @@
                             <thead>
                                 <tr class="bg-brand-50 text-brand-800 border-b border-brand-200 text-xs uppercase tracking-wider font-bold">
                                     <th class="p-4">Hán Tự</th>
-                                    <th class="p-4">Pinyin</th>
+                                    <th class="p-4">Phiên âm</th>
                                     <th class="p-4">Hán Việt</th>
                                     <th class="p-4">Nghĩa</th>
                                     <th class="p-4 text-center">Luyện Viết</th>
@@ -2931,18 +3202,20 @@
             <!-- HỘI THOẠI -->
             <section id="mode-dialogue" class="study-mode hidden flex flex-col w-full gap-5">
 
+                <div id="dialogue-sticky-bar" class="flex flex-col gap-3 backdrop-blur-md">
+
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <h2 class="font-extrabold text-brand-800 text-base sm:text-2xl flex items-start gap-2 min-w-0 w-full">
+                    <h2 class="order-2 font-extrabold text-brand-800 text-base sm:text-2xl flex items-start gap-2 min-w-0 w-full">
                         <span class="shrink-0">💬</span>
                         <span id="dialogue-title-label" class="min-w-0 flex-1 font-hanzi leading-snug">Hội Thoại</span>
                     </h2>
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex items-center gap-2 shrink-0 order-1" id="dialogue-selector-group">
                         <div class="relative" id="dialogue-hsk-dropdown-wrapper">
                             <button type="button" id="dialogue-hsk-dropdown-btn" class="bg-brand-50 border border-brand-200 text-brand-950 text-sm font-medium rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer min-w-[90px] flex items-center justify-between gap-2">
-                                <span id="dialogue-hsk-dropdown-label">HSK 1</span>
+                                <span id="dialogue-hsk-dropdown-label" class="whitespace-nowrap">HSK 1</span>
                                 <i class="fa-solid fa-chevron-down text-xs text-brand-400"></i>
                             </button>
-                            <div id="dialogue-hsk-dropdown-panel" class="hidden absolute right-0 z-30 mt-1.5 w-32 bg-white border border-brand-200 rounded-xl shadow-lg py-1.5 max-h-80 overflow-y-auto">
+                            <div id="dialogue-hsk-dropdown-panel" class="hidden absolute left-0 z-30 mt-1.5 w-32 bg-white border border-brand-200 rounded-xl shadow-lg py-1.5 max-h-80 overflow-y-auto">
                                 <!-- Danh sách HSK (Text 1/2/3) được dựng động bằng JS, xem renderDialogueHskDropdown() -->
                             </div>
                         </div>
@@ -2958,14 +3231,14 @@
                     </div>
                 </div>
 
-                <!-- Tab chọn đoạn hội thoại con (X.1 / X.2 / X.3) + nút ẩn/hiện Pinyin -->
+                <!-- Tab chọn đoạn hội thoại con (X.1 / X.2 / X.3) + nút ẩn/hiện Phiên âm -->
                 <div class="flex items-center justify-start sm:justify-center gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto scrollbar-none pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
                     <div class="flex gap-1 sm:gap-1.5 bg-brand-50 border border-brand-200 rounded-xl p-1 w-fit shrink-0" id="dialogue-sub-tabs">
                         <!-- Dựng động bằng JS -->
                     </div>
                     <button type="button" id="dialogue-pinyin-toggle-btn" class="shrink-0 flex items-center gap-1 sm:gap-1.5 bg-brand-50 border border-brand-200 hover:bg-brand-100 text-brand-700 text-[11px] sm:text-sm font-bold rounded-xl px-2.5 sm:px-3 py-2 transition whitespace-nowrap">
                         <i class="fa-solid fa-eye"></i>
-                        <span>Pinyin</span>
+                        <span>Phiên âm</span>
                     </button>
                     <button type="button" id="dialogue-meaning-toggle-btn" class="shrink-0 flex items-center gap-1 sm:gap-1.5 bg-brand-50 border border-brand-200 hover:bg-brand-100 text-brand-700 text-[11px] sm:text-sm font-bold rounded-xl px-2.5 sm:px-3 py-2 transition whitespace-nowrap">
                         <i class="fa-solid fa-eye"></i>
@@ -2973,15 +3246,64 @@
                     </button>
                 </div>
 
-                <div id="dialogue-content" class="bg-white rounded-2xl border border-brand-200 shadow-sm p-4 sm:p-6 max-w-2xl mx-auto w-full flex flex-col gap-3 min-h-[240px]">
+                </div>
+
+                <div id="dialogue-content" class="bg-white rounded-2xl border border-brand-200 shadow-sm p-4 sm:p-6 max-w-4xl mx-auto w-full flex flex-col gap-3 min-h-[240px]">
                     <!-- Các dòng hội thoại được dựng động bằng JS, xem renderDialogue() -->
                 </div>
 
                 <div id="dialogue-empty-state" class="hidden text-center text-brand-500 text-sm py-10">
-                    Không tải được dữ liệu hội thoại (file <code>HỘI_THOẠI.xlsx</code>). Hãy chắc chắn file này được đặt cùng thư mục với <code>index.html</code> rồi tải lại trang.
+                    Không tải được dữ liệu hội thoại (file <code>Hoi_thoai.xlsx</code>). Hãy chắc chắn file này được đặt cùng thư mục với <code>index.html</code> rồi tải lại trang.
                 </div>
 
             </section>
+
+<!-- ===== GRAMMAR MODAL (bố cục) ===== -->
+<section id="mode-grammar" class="study-mode hidden flex flex-col w-full gap-5">
+    <div id="grammar-modal-inner">
+
+
+<header>
+  <div class="hz-watermark">語法</div>
+  <div class="eyebrow">Kho ngữ pháp · Hán ngữ</div>
+  <div class="source-tags" id="curriculumSwitcher">
+    <button type="button" class="source-tag curriculum-btn" data-curriculum="boya"><b>Giáo trình Boya</b></button>
+    <button type="button" class="source-tag curriculum-btn active" data-curriculum="yufa"><b>Giáo trình HSK chuẩn</b></button>
+    <button type="button" class="source-tag curriculum-btn" data-curriculum="custom"><b>✎ Tự nhập</b></button>
+  </div>
+</header>
+
+<div class="control-bar">
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke-width="2" stroke-linecap="round"/></svg>
+    <input id="searchInput" type="text" placeholder="Tìm ngữ pháp: 把, 被, so sánh, bổ ngữ...">
+  </div>
+  <div class="level-nav" id="levelNav"></div>
+  <div class="lesson-nav" id="lessonNav" style="display:none;"></div>
+</div>
+
+<div class="import-panel-wrap" id="importPanel" style="display:none;">
+  <div class="import-panel">
+    <div>
+      <h3>✎ Tự nhập điểm ngữ pháp</h3>
+      <p>Nhập file Excel (.xlsx) với các cột: <code>Tiêu đề</code>, <code>Cấu trúc</code>, <code>Tóm tắt</code>, <code>Giải thích</code>, <code>Ví dụ Trung 1</code>, <code>Ví dụ Phiên âm 1</code>, <code>Ví dụ Nghĩa 1</code>, <code>Ví dụ Trung 2</code>, <code>Ví dụ Phiên âm 2</code>, <code>Ví dụ Nghĩa 2</code>, <code>Lưu ý</code>, <code>Tham chiếu</code>. Mỗi dòng là một điểm ngữ pháp, hiển thị theo đúng mẫu thẻ đang dùng trong trang.</p>
+      <div class="import-msg" id="importMsg"></div>
+    </div>
+    <div class="import-actions">
+      <button type="button" class="import-btn" id="btnImportExcel">📥 Nhập file Excel</button>
+      <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display:none;">
+      <button type="button" class="import-btn ghost" id="btnDownloadTemplate">⬇️ Tải file mẫu</button>
+      <button type="button" class="import-btn ghost" id="btnClearCustom">🗑 Xóa hết mục tự nhập</button>
+    </div>
+  </div>
+</div>
+
+<main id="mainContent"></main>
+
+<footer>坚持就是胜利 · Kiên trì chính là chiến thắng — mỗi điểm ngữ pháp bạn học hôm nay là một bước tiến gần hơn đến trình độ HSK mơ ước. Cố lên nhé! 加油！</footer>
+    </div>
+</section>
+
 
         </div>
 
@@ -3006,7 +3328,7 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-bold text-brand-800 mb-1">Pinyin *</label>
+                        <label class="block text-xs font-bold text-brand-800 mb-1">Phiên âm *</label>
                         <input type="text" id="input-pinyin" required placeholder="VD: péngyǒu" class="w-full bg-brand-50 border border-brand-200 rounded-xl px-3.5 py-2 text-sm text-brand-950 focus:ring-2 focus:ring-brand-500 focus:outline-none">
                     </div>
                     <div>
@@ -3059,7 +3381,6 @@
                     <i class="fa-solid fa-gear text-brand-500"></i>
                     Cài Đặt Hiển Thị
                 </h3>
-                <p class="text-xs text-slate-500 mb-4">Chọn các trường sẽ hiện trên Thẻ Nhớ</p>
             </div>
 
             <div class="px-6 overflow-y-auto flex-grow">
@@ -3074,7 +3395,7 @@
                     </select>
                 </div>
                 <div class="px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl">
-                    <span class="text-sm font-bold text-brand-900 block mb-2">Pinyin</span>
+                    <span class="text-sm font-bold text-brand-900 block mb-2">Phiên âm</span>
                     <select data-field="pinyin" class="field-side-select w-full bg-white border border-brand-200 text-brand-950 text-sm font-medium rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
                         <option value="front">Mặt trước</option>
                         <option value="back">Mặt sau</option>
@@ -3082,16 +3403,8 @@
                     </select>
                 </div>
                 <div class="px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl">
-                    <span class="text-sm font-bold text-brand-900 block mb-2">Hán Việt</span>
-                    <select data-field="hanviet" class="field-side-select w-full bg-white border border-brand-200 text-brand-950 text-sm font-medium rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
-                        <option value="front">Mặt trước</option>
-                        <option value="back">Mặt sau</option>
-                        <option value="both">Mặt trước & mặt sau</option>
-                    </select>
-                </div>
-                <div class="px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl">
-                    <span class="text-sm font-bold text-brand-900 block mb-2">Loại từ</span>
-                    <select data-field="wordtype" class="field-side-select w-full bg-white border border-brand-200 text-brand-950 text-sm font-medium rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                    <span class="text-sm font-bold text-brand-900 block mb-2">Hán Việt & Loại từ</span>
+                    <select data-field="hanviet,wordtype" class="field-side-select w-full bg-white border border-brand-200 text-brand-950 text-sm font-medium rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
                         <option value="front">Mặt trước</option>
                         <option value="back">Mặt sau</option>
                         <option value="both">Mặt trước & mặt sau</option>
@@ -3112,9 +3425,8 @@
             <div class="border-t border-brand-100 mt-4 pt-4">
                 <h4 class="text-sm font-bold text-brand-900 mb-1 flex items-center gap-2">
                     <i class="fa-solid fa-filter text-brand-500"></i>
-                    Lọc Theo Trạng Thái Học
+                    Lọc từ vựng
                 </h4>
-                <p class="text-xs text-slate-500 mb-3">Chỉ hiển thị những từ thuộc trạng thái đã chọn</p>
 
                 <div class="space-y-2.5">
                     <label class="flex items-center justify-between px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl cursor-pointer">
@@ -3126,7 +3438,7 @@
                         <input type="radio" name="setting-status-filter" id="setting-status-unknown" value="UNKNOWN" class="w-5 h-5 accent-red-600 cursor-pointer">
                     </label>
                     <label class="flex items-center justify-between px-3.5 py-2.5 bg-accent-50 border border-accent-200 rounded-xl cursor-pointer">
-                        <span class="text-sm font-bold text-accent-800">Cần ôn (đến hạn hôm nay)</span>
+                        <span class="text-sm font-bold text-accent-800">Cần ôn</span>
                         <input type="radio" name="setting-status-filter" id="setting-status-review" value="REVIEW" class="w-5 h-5 accent-accent-600 cursor-pointer">
                     </label>
                     <label class="flex items-center justify-between px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl cursor-pointer">
@@ -3140,7 +3452,6 @@
                         <i class="fa-solid fa-shuffle text-brand-500 mt-0.5"></i>
                         <span>
                             <span class="text-sm font-bold text-brand-900 block">Hiển Thị Từ Vựng Ngẫu Nhiên</span>
-                            <span class="text-xs text-slate-500">Xáo trộn thứ tự thẻ nhớ thay vì hiển thị tuần tự</span>
                         </span>
                     </span>
                     <input type="checkbox" id="setting-random-order" class="w-5 h-5 accent-brand-500 cursor-pointer shrink-0 ml-2">
@@ -3152,7 +3463,6 @@
                     <i class="fa-solid fa-clock text-brand-500"></i>
                     Thời Gian Tự Động Chuyển Thẻ
                 </h4>
-                <p class="text-xs text-slate-500 mb-3">Áp dụng cho nút ▶️ tự động chuyển thẻ nhớ</p>
 
                 <select id="setting-auto-play-speed" class="w-full bg-brand-50 border border-brand-200 text-brand-950 text-sm font-medium rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
                     <option value="1">1 giây</option>
@@ -3174,7 +3484,6 @@
                         <i class="fa-solid fa-volume-high text-brand-500 mt-0.5"></i>
                         <span>
                             <span class="text-sm font-bold text-brand-900 block">Tự Động Phát Âm Từ Mới</span>
-                            <span class="text-xs text-slate-500">Tự đọc to Hán tự mỗi khi chuyển sang thẻ mới</span>
                         </span>
                     </span>
                     <input type="checkbox" id="setting-auto-speak-new-word" class="w-5 h-5 accent-brand-500 cursor-pointer shrink-0 ml-2">
@@ -3197,22 +3506,6 @@
                     Không tìm thấy giọng đọc tiếng Trung nào trên thiết bị này. Hãy vào Cài đặt hệ thống (Windows/macOS/Android/iOS) để tải thêm gói giọng đọc tiếng Trung, sau đó tải lại trang.
                 </p>
 
-                <!-- [iOS] Chỉ hiện khi phát hiện đang dùng iPhone/iPad VÀ chưa có giọng chất lượng
-                     cao (Enhanced/Premium) nào — xem showIOSVoiceTipIfNeeded(). Đây là nguyên nhân
-                     phổ biến nhất khiến app trên iPhone chỉ thấy 1 giọng "Tingting [Máy]" mặc định,
-                     vì Safari CHỈ liệt kê những giọng đã được TẢI SẴN trong Cài đặt hệ thống — trang
-                     web không thể tự tải giọng thay người dùng được. -->
-                <div id="ios-voice-tip" class="hidden mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 leading-relaxed">
-                    <p class="font-bold mb-1.5 flex items-center gap-1.5"><i class="fa-brands fa-apple"></i> iPhone/iPad chỉ có 1 giọng đọc chuẩn (không tự nhiên)?</p>
-                    <p class="mb-2">Đây là do Safari trên iOS chỉ liệt kê những giọng bạn đã <b>tải sẵn trong Cài đặt máy</b> — trang web không tự tải giọng thay bạn được. Hãy tải giọng <b>Enhanced/Premium</b> (chất lượng cao, gần giống người thật) theo các bước sau, sau đó quay lại đây bấm "Xong" rồi mở lại app:</p>
-                    <ol class="list-decimal list-inside space-y-1">
-                        <li>Mở app <b>Cài đặt (Settings)</b> của iPhone/iPad</li>
-                        <li>Vào <b>Trợ năng (Accessibility)</b> → <b>Nội dung được đọc (Spoken Content)</b> → <b>Giọng nói (Voices)</b></li>
-                        <li>Chọn <b>Chinese (Mandarin - PRC)</b> / <b>Tiếng Trung</b></li>
-                        <li>Bấm tải (biểu tượng ☁️) bên cạnh giọng có ghi <b>"Enhanced"</b> hoặc <b>"Premium"</b> (ví dụ: Tingting Enhanced, Tingting Premium)</li>
-                        <li>Quay lại Safari, <b>tải lại trang web này</b>, mở lại mục Cài Đặt trong app và chọn đúng giọng "Enhanced/Premium" vừa tải</li>
-                    </ol>
-                </div>
             </div>
 
             </div>
@@ -3238,6 +3531,14 @@
 
             <div class="flex flex-col items-center gap-3">
                 <div id="quick-writing-holder" class="mx-auto"></div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-quick-writing-pause" type="button" class="w-9 h-9 flex items-center justify-center rounded-full bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-600 transition" title="Tạm dừng / Tiếp tục chạy tự động">
+                        <i id="btn-quick-writing-pause-icon" class="fa-solid fa-pause text-sm"></i>
+                    </button>
+                    <button id="btn-quick-writing-speed" type="button" class="h-9 min-w-9 px-3 flex items-center justify-center rounded-full bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-600 text-xs font-bold transition" title="Đổi tốc độ chạy tự động">
+                        1x
+                    </button>
+                </div>
                 <div id="quick-writing-char-tabs" class="flex flex-wrap justify-center gap-2"></div>
             </div>
         </div>
@@ -3266,7 +3567,7 @@
                     </button>
                 </div>
                 <p class="text-xs text-brand-800 leading-relaxed">
-                    Tên cột: <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Hán tự</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Pinyin</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Hán Việt</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Nghĩa</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Ví dụ câu</span>.
+                    Tên cột: <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Hán tự</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Phiên âm</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Hán Việt</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Nghĩa</span>, <span class="text-brand-950 font-mono bg-white px-1.5 py-0.5 rounded border border-brand-200">Ví dụ câu</span>.
                 </p>
             </div>
 
@@ -3321,7 +3622,7 @@
 
         // Tải và phân tích file Tu vung.xlsx (đặt cùng thư mục với index.html trên GitHub).
         // Mỗi sheet trong file = một giáo trình/cấp độ (VD: sheet "HSK1", sheet "GT_HSK1"...).
-        // Cột trong mỗi sheet: STT | Hán tự | Pinyin | Hán Việt | Nghĩa | Ví dụ câu | Pinyin câu | Nghĩa câu | Bài (tùy chọn)
+        // Cột trong mỗi sheet: STT | Hán tự | Phiên âm | Hán Việt | Nghĩa | Ví dụ câu | Phiên âm câu | Nghĩa câu | Bài (tùy chọn)
         async function loadVocabularyFromExcel() {
             const res = await fetch(encodeURI('Tu vung.xlsx') + '?v=' + Date.now(), { cache: 'no-store' });
             if (!res.ok) throw new Error('Không tìm thấy Tu vung.xlsx (HTTP ' + res.status + ')');
@@ -3332,7 +3633,11 @@
             const unmatchedSheets = [];
             const sheetSummary = [];
             workbook.SheetNames.forEach(sheetName => {
-                const matchedLevel = HSK_SHEET_NAMES.find(code => normalizeSheetCode(code) === normalizeSheetCode(sheetName));
+                let matchedLevel = HSK_SHEET_NAMES.find(code => normalizeSheetCode(code) === normalizeSheetCode(sheetName));
+                // Cho phép đặt tên sheet kiểu "HSK 7-9" / "HSK7-9" (có dấu gạch ngang, cách viết
+                // thông thường của 1 khoảng cấp độ) — chuẩn hóa sẽ mất số 8 ở giữa ("HSK7-9" -> "hsk79"),
+                // nên cần nhận diện riêng và quy về mã "HSK789".
+                if (!matchedLevel && normalizeSheetCode(sheetName) === 'hsk79') matchedLevel = 'HSK789';
                 if (!matchedLevel) unmatchedSheets.push(sheetName);
                 const level = matchedLevel || sheetName.trim();
                 const sheet = workbook.Sheets[sheetName];
@@ -3376,7 +3681,7 @@
         }
 
         // ═══════════════════════════════════════════════════════════════
-        // [HỘI THOẠI] Tải và phân tích file HỘI_THOẠI.xlsx (đặt cùng thư mục
+        // [HỘI THOẠI] Tải và phân tích file Hoi_thoai.xlsx (đặt cùng thư mục
         // với index.html). File có 3 sheet "Text 1" / "Text 2" / "Text 3" tương ứng
         // HSK 1 / HSK 2 / HSK 3 (không tính sheet "Giới thiệu nhân vật"). Mỗi sheet
         // có cấu trúc:
@@ -3391,9 +3696,14 @@
         // ═══════════════════════════════════════════════════════════════
         const DIALOGUE_HSK_SHEET_MAP = { HSK1: 'Text 1', HSK2: 'Text 2', HSK3: 'Text 3' };
 
+        // Đổi sang tên file KHÔNG DẤU "Hoi_thoai.xlsx" để tránh mọi rắc rối liên quan
+        // đến ký tự tiếng Việt trên server (chuẩn hoá Unicode NFC/NFD khác nhau giữa
+        // Mac/Windows/Linux khi push lên GitHub, phân biệt hoa/thường, lỗi encode URL...).
+        const DIALOGUE_FILE_NAME = 'Hoi_thoai.xlsx';
+
         async function loadDialogueFromExcel() {
-            const res = await fetch(encodeURI('HỘI_THOẠI.xlsx') + '?v=' + Date.now(), { cache: 'no-store' });
-            if (!res.ok) throw new Error('Không tìm thấy HỘI_THOẠI.xlsx (HTTP ' + res.status + ')');
+            const res = await fetch(encodeURI(DIALOGUE_FILE_NAME) + '?v=' + Date.now(), { cache: 'no-store' });
+            if (!res.ok) throw new Error('Không tìm thấy ' + DIALOGUE_FILE_NAME + ' (HTTP ' + res.status + ')');
             const buf = await res.arrayBuffer();
             const workbook = XLSX.read(buf, { type: 'array' });
 
@@ -3612,7 +3922,7 @@
             statusFilter: localStorage.getItem('zh_status_filter') || 'ALL',
             filteredVocab: [],
 
-            // [HỘI THOẠI] Dữ liệu đọc từ HỘI_THOẠI.xlsx: { [HSK]: { [bài]: { [đoạn]: [ {speaker,text,pinyin,meaningVi}, ... ] } } }
+            // [HỘI THOẠI] Dữ liệu đọc từ Hoi_thoai.xlsx: { [HSK]: { [bài]: { [đoạn]: [ {speaker,text,pinyin,meaningVi}, ... ] } } }
             dialogueData: {},
             dialogueHsk: 'HSK1',
             dialogueLesson: null,
@@ -3658,6 +3968,10 @@
             soUsedKeys: new Set(),
             quickWriter: null,
             quickWritingTimer: null,
+            quickWritingPaused: false,
+            quickWritingPausedMidAnim: false,
+            quickWritingSpeedIndex: 1, // trỏ vào QUICK_WRITING_SPEED_LEVELS, mặc định "1x"
+            quickWritingAutoPaused: false, // đánh dấu việc tạm dừng tự động do tab bị ẩn (khác với người dùng tự bấm dừng)
 
             // Listening Quiz State
             listeningTotal: 0,
@@ -3672,6 +3986,7 @@
             // MCQ Quiz State
             currentQuizQuestion: null,
             quizUsedIds: new Set(),
+            quizTotal: 0,
 
             // Điểm tích lũy dùng CHUNG cho mọi khối luyện tập (Trắc nghiệm, Nghe và chọn nghĩa, ...)
             dailyScore: (() => {
@@ -3826,6 +4141,11 @@
 
             // Chỉ kiểm tra thưởng chuỗi khi vừa CỘNG điểm (delta dương), không xét khi bị trừ điểm
             if (delta > 0) checkAndAwardStreakBonus();
+
+            // Đồng bộ điểm lên Firestore (nếu đã đăng nhập)
+            if (typeof window.syncScoreToFirestore === 'function') {
+                window.syncScoreToFirestore(appState.totalScore);
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -4032,7 +4352,6 @@
         function populateVoiceSelectDropdown() {
             const select = document.getElementById('setting-voice-select');
             const emptyHint = document.getElementById('voice-select-empty-hint');
-            const iosTip = document.getElementById('ios-voice-tip');
             if (!select) return;
             const voices = getMandarinVoices();
             const savedName = localStorage.getItem('zh_selected_voice_name') || '';
@@ -4047,11 +4366,6 @@
             select.value = voices.some(v => v.name === savedName) ? savedName : '';
 
             if (emptyHint) emptyHint.classList.toggle('hidden', voices.length > 0);
-
-            // Chỉ có giọng "thường" (không có giọng nào Enhanced/Premium/Natural...) trên iPhone/iPad
-            // => rất có thể người dùng chưa tải giọng chất lượng cao trong Cài đặt máy. Hiện hướng dẫn.
-            const hasNaturalVoice = voices.some(v => isNaturalVoiceName(v.name));
-            if (iosTip) iosTip.classList.toggle('hidden', !(isIOSDevice() && !hasNaturalVoice));
         }
 
         function pickVoiceByGender(gender) {
@@ -4097,6 +4411,11 @@
                 if (speedSelect) {
                     utterance.rate = parseFloat(speedSelect.value || 1.0);
                 }
+
+                // Khi giọng đọc máy đọc xong tự nhiên (không phải do người dùng bấm dừng),
+                // đưa icon nút 🔊 tương ứng (nếu có, dùng cho phần Hội Thoại) về lại bình thường.
+                utterance.onend = () => resetDialoguePlayingBtnIcon();
+                utterance.onerror = () => resetDialoguePlayingBtnIcon();
 
                 window.speechSynthesis.speak(utterance);
             }, 40);
@@ -4461,7 +4780,7 @@
             const title = appState.dialogueLesson !== null ? getDialogueLessonTitle(appState.dialogueHsk, appState.dialogueLesson) : null;
             // Tên đoạn hội thoại chỉ hiển thị tiếng Việt (lấy từ dòng đầu tiên của bài, cột nghĩa tiếng Việt),
             // áp dụng cho cả HSK1/HSK2/HSK3 vì dùng chung hàm này.
-            label.textContent = (title && title.meaningVi) ? title.meaningVi : 'Hội Thoại';
+            label.textContent = (title && title.hanzi) ? title.hanzi : 'Hội Thoại';
         }
 
         function renderDialogueLessonDropdown() {
@@ -4523,7 +4842,7 @@
             { bg: 'bg-teal-100', text: 'text-teal-900', badge: 'bg-teal-500' },
         ];
 
-        // [HỘI THOẠI] Chuyển chữ Hán -> Pinyin bằng thư viện pinyin-pro (đã nhúng ở đầu trang).
+        // [HỘI THOẠI] Chuyển chữ Hán -> Phiên âm bằng thư viện pinyin-pro (đã nhúng ở đầu trang).
         // Có cache lại để không phải tính lại pinyin mỗi lần bấm nút ẩn/hiện.
         const _dialoguePinyinCache = {};
         function getDialoguePinyin(text) {
@@ -4542,7 +4861,7 @@
             return result;
         }
 
-        // Cập nhật icon của nút ẩn/hiện Pinyin theo trạng thái hiện tại (nhãn luôn là "Pinyin")
+        // Cập nhật icon của nút ẩn/hiện Phiên âm theo trạng thái hiện tại (nhãn luôn là "Phiên âm")
         function updateDialoguePinyinToggleBtn() {
             const btn = document.getElementById('dialogue-pinyin-toggle-btn');
             if (!btn) return;
@@ -4588,10 +4907,8 @@
             if (lines.length === 0) {
                 if (context && context.hanzi) {
                     container.innerHTML = `
-                        <p class="text-center text-xs font-bold text-brand-400 uppercase tracking-wider mb-1">Bài ${lesson}.${sub}</p>
                         <div class="text-slate-700 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3.5 shadow-sm">
-                            ${context.meaningVi ? `<p class="text-base font-bold text-slate-700 leading-snug">${escapeHtml(context.meaningVi)}</p>` : ''}
-                            ${context.pinyin ? `<p class="dialogue-pinyin-line ${appState.dialogueShowPinyin ? '' : 'hidden'} text-sm font-semibold text-brand-500/80 mt-1 tracking-wide">${escapeHtml(context.pinyin)}</p>` : ''}
+                            ${context.meaningVi ? `<p class="dialogue-context-meaning text-base font-bold text-slate-700 leading-snug">${escapeHtml(context.meaningVi)}</p>` : ''}
                         </div>
                     `;
                     if (emptyState) emptyState.classList.add('hidden');
@@ -4617,11 +4934,9 @@
             });
 
             container.innerHTML = `
-                <p class="text-center text-xs font-bold text-brand-400 uppercase tracking-wider mb-1">Bài ${lesson}.${sub}</p>
                 ${context && context.hanzi ? `
                 <div class="text-center text-xs sm:text-sm text-slate-500 bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 mb-1">
-                    ${context.meaningVi ? `<p class="not-italic font-bold text-slate-700">${escapeHtml(context.meaningVi)}</p>` : ''}
-                    ${context.pinyin ? `<p class="dialogue-pinyin-line ${appState.dialogueShowPinyin ? '' : 'hidden'} not-italic text-brand-500/80 mt-0.5">${escapeHtml(context.pinyin)}</p>` : ''}
+                    ${context.meaningVi ? `<p class="dialogue-context-meaning not-italic font-bold text-slate-700">${escapeHtml(context.meaningVi)}</p>` : ''}
                 </div>` : ''}
                 <div id="dialogue-audio-wrapper" class="hidden mb-2">
                     <audio id="dialogue-audio-player" controls preload="metadata" class="w-full h-10"></audio>
@@ -4633,8 +4948,8 @@
                     const pinyinHiddenClass = appState.dialogueShowPinyin ? '' : 'hidden';
                     const meaningHiddenClass = appState.dialogueShowMeaning ? '' : 'hidden';
                     return `
-                    <div class="flex flex-col gap-1 max-w-[85%] ${'self-start'}">
-                        ${l.speaker ? `<span class="text-[11px] font-bold text-brand-500 px-1">${escapeHtml(l.speaker)}</span>` : ''}
+                    <div class="flex flex-col gap-1 max-w-[96%] sm:max-w-[92%] ${'self-start'}">
+                        ${l.speaker ? `<span class="dialogue-speaker-line text-[11px] font-bold text-brand-500 px-1">${escapeHtml(l.speaker)}</span>` : ''}
                         <div class="flex items-start gap-2">
                             <div class="${c.bg} ${c.text} rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm">
                                 ${pinyinText ? `<p class="dialogue-pinyin-line ${pinyinHiddenClass} text-xs sm:text-sm font-semibold text-brand-500/80 mb-0.5 tracking-wide">${escapeHtml(pinyinText)}</p>` : ''}
@@ -4661,19 +4976,32 @@
                     const wrapper = document.getElementById('dialogue-audio-wrapper');
                     const audioReady = player && wrapper && !wrapper.classList.contains('hidden') && player.src;
 
+                    // Bấm lại đúng nút đang phát => dừng lại (toggle), thay vì phát lại từ đầu.
+                    if (_dialoguePlayingBtn === btn) {
+                        stopDialogueSpeaking();
+                        return;
+                    }
+
+                    // Nếu có câu khác/giọng đọc máy đang phát dở, dừng nó lại trước khi phát câu mới.
+                    stopDialogueSpeaking();
+
                     if (hasTime && audioReady) {
+                        setDialoguePlayingBtn(btn);
                         playDialogueAudioSegment(player, lineTimes, idx);
                     } else {
                         // Chưa có mốc thời gian cho câu này (hoặc chưa có file mp3) => dùng giọng đọc máy
+                        setDialoguePlayingBtn(btn);
                         speakHanzi(btn.getAttribute('data-text'));
                     }
                 });
             });
 
-            // [HỘI THOẠI] Nếu có file ghi âm thật đặt trong thư mục con "audio hsk1" /
-            // "audio hsk2" / "audio hsk3" (cùng cấp với index.html, chọn theo đúng cấp độ
-            // đang xem) theo quy ước tên file "<Bài>_<Đoạn>.mp3"
-            // (vd: HSK1 bài 4.1 => "audio hsk1/4_1.mp3", HSK2 bài 4.1 => "audio hsk2/4_1.mp3"),
+            // [HỘI THOẠI] Nếu có file ghi âm thật đặt trong thư mục con "Audio HSK1" /
+            // "Audio HSK2 (A)" (bài 1-7) / "Audio HSK2 (B)" (bài 8-15) /
+            // "Audio HSK3 (A)" (bài 1-10) / "Audio HSK3 (B)" (bài 11-18)
+            // (cùng cấp với index.html, chọn theo đúng cấp độ đang xem) theo quy ước tên
+            // file "<Bài>_<Đoạn>.mp3"
+            // (vd: HSK1 bài 4.1 => "Audio HSK1/4_1.mp3", HSK2 bài 4.1 => "Audio HSK2 (A)/4_1.mp3"),
             // hiển thị trình phát để nghe file ghi âm thật thay vì chỉ giọng đọc máy (TTS) ở
             // từng câu.
             loadDialogueAudio(appState.dialogueHsk, lesson, sub);
@@ -4683,16 +5011,77 @@
         }
 
         // Ánh xạ mã HSK (HSK1/HSK2/HSK3) sang tên thư mục chứa file mp3 tương ứng.
+        // Giá trị có thể là:
+        //   - một chuỗi cố định (dùng chung 1 thư mục cho mọi bài), hoặc
+        //   - một hàm nhận vào số bài (lesson) và trả về tên thư mục tương ứng — dùng khi
+        //     audio được chia làm nhiều thư mục con theo khoảng bài (như HSK2 bên dưới).
         // Muốn thêm audio cho HSK4 trở lên, chỉ cần thêm dòng tương ứng vào đây.
-        const DIALOGUE_AUDIO_FOLDER_MAP = { HSK1: 'audio hsk1', HSK2: 'audio hsk2', HSK3: 'audio hsk3' };
+        const DIALOGUE_AUDIO_FOLDER_MAP = {
+            HSK1: 'Audio HSK1',
+            // HSK2: bài 1-7 nằm trong "Audio HSK2 (A)", bài 8-15 nằm trong "Audio HSK2 (B)".
+            HSK2: (lesson) => (lesson <= 7 ? 'Audio HSK2 (A)' : 'Audio HSK2 (B)'),
+            // HSK3: bài 1-10 nằm trong "Audio HSK3 (A)", bài 11-18 nằm trong "Audio HSK3 (B)".
+            HSK3: (lesson) => (lesson <= 10 ? 'Audio HSK3 (A)' : 'Audio HSK3 (B)')
+        };
 
         // Thử tải file ghi âm thật cho đoạn hội thoại hiện tại. Nếu không tìm thấy file,
         // ẩn trình phát đi và người dùng vẫn dùng được nút 🔊 (TTS) ở từng câu như cũ.
+        // [HỘI THOẠI] Quản lý trạng thái nút 🔊 đang phát để có thể bấm lần nữa là dừng lại
+        // (toggle) — dùng chung cho cả trường hợp phát đoạn mp3 thật lẫn giọng đọc máy (TTS).
+        let _dialoguePlayingBtn = null;
+
+        function setDialoguePlayingBtn(btn) {
+            _dialoguePlayingBtn = btn;
+            if (btn) {
+                const icon = btn.querySelector('i');
+                if (icon) icon.className = 'fa-solid fa-stop text-xs';
+            }
+        }
+
+        function resetDialoguePlayingBtnIcon() {
+            if (_dialoguePlayingBtn) {
+                const icon = _dialoguePlayingBtn.querySelector('i');
+                if (icon) icon.className = 'fa-solid fa-volume-high text-xs';
+            }
+            _dialoguePlayingBtn = null;
+        }
+
+        // Dừng bất kỳ thứ gì đang phát cho hội thoại (đoạn mp3 thật hoặc giọng đọc máy) và
+        // đưa icon nút 🔊 đang bật về lại trạng thái ban đầu.
+        function stopDialogueSpeaking() {
+            const player = document.getElementById('dialogue-audio-player');
+            if (player && !player.paused) player.pause();
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            resetDialoguePlayingBtnIcon();
+        }
+
         function loadDialogueAudio(hskCode, lesson, sub) {
             const wrapper = document.getElementById('dialogue-audio-wrapper');
             const player = document.getElementById('dialogue-audio-player');
             if (!wrapper || !player) return;
-            const folder = DIALOGUE_AUDIO_FOLDER_MAP[hskCode];
+
+            // Cho phép người dùng tự kéo thanh tua để chọn vị trí phát bất kỳ. Nếu trước đó
+            // đã bấm nghe 1 câu cụ thể (playDialogueAudioSegment), một trình lắng nghe
+            // 'timeupdate' đang chờ tự dừng đúng lúc hết câu đó vẫn còn treo trên player; nếu
+            // người dùng tự tua sang vị trí khác, trình lắng nghe cũ sẽ hiểu nhầm là đã "hết
+            // câu" và tự pause lại ngay. Vì vậy cần huỷ trình lắng nghe đó mỗi khi có sự kiện
+            // tua thủ công ('seeking') để việc chọn vị trí phát hoạt động bình thường.
+            if (!player.dataset.seekGuardAttached) {
+                player.dataset.seekGuardAttached = '1';
+                player.addEventListener('seeking', () => {
+                    if (_dialogueSegmentStopHandler) {
+                        player.removeEventListener('timeupdate', _dialogueSegmentStopHandler);
+                        _dialogueSegmentStopHandler = null;
+                    }
+                });
+                // Bất kể vì lý do gì player dừng lại (hết câu tự động, người dùng bấm nút
+                // pause gốc, hay tua sang chỗ khác), đưa icon nút 🔊 tương ứng về lại
+                // trạng thái ban đầu để phản ánh đúng trạng thái đang phát/không phát.
+                player.addEventListener('pause', resetDialoguePlayingBtnIcon);
+            }
+
+            const folderEntry = DIALOGUE_AUDIO_FOLDER_MAP[hskCode];
+            const folder = typeof folderEntry === 'function' ? folderEntry(lesson) : folderEntry;
 
             wrapper.classList.add('hidden');
             player.removeAttribute('src');
@@ -4710,6 +5099,7 @@
                 wrapper.classList.add('hidden');
             });
         }
+
 
         // [HỘI THOẠI] Phát 1 đoạn (câu) trong file mp3 ghi âm cả bài: nhảy đến đúng giây bắt đầu
         // của câu (lineTimes[idx]) và tự dừng lại khi chạm mốc thời gian của câu kế tiếp.
@@ -4796,7 +5186,7 @@
                 document.addEventListener('click', () => panel.classList.add('hidden'));
             }
 
-            // [HỘI THOẠI] Nút ẩn/hiện Pinyin — chỉ cần bật/tắt class "hidden" trên các dòng
+            // [HỘI THOẠI] Nút ẩn/hiện Phiên âm — chỉ cần bật/tắt class "hidden" trên các dòng
             // pinyin đã render sẵn, không cần vẽ lại toàn bộ khung chat.
             const pinyinToggleBtn = document.getElementById('dialogue-pinyin-toggle-btn');
             if (pinyinToggleBtn) {
@@ -4810,7 +5200,7 @@
                 });
             }
 
-            // [HỘI THOẠI] Nút ẩn/hiện Nghĩa tiếng Việt — tương tự nút Pinyin ở trên.
+            // [HỘI THOẠI] Nút ẩn/hiện Nghĩa tiếng Việt — tương tự nút Phiên âm ở trên.
             const meaningToggleBtn = document.getElementById('dialogue-meaning-toggle-btn');
             if (meaningToggleBtn) {
                 meaningToggleBtn.addEventListener('click', () => {
@@ -4844,9 +5234,9 @@
             try {
                 appState.dialogueData = await loadDialogueFromExcel();
             } catch (err) {
-                console.error('Lỗi tải HỘI_THOẠI.xlsx:', err);
+                console.error('Lỗi tải Hoi_thoai.xlsx:', err);
                 appState.dialogueData = {};
-                showToast('Không tải được HỘI_THOẠI.xlsx — kiểm tra file có đúng tên, nằm cùng thư mục index.html.', 'error', 6000);
+                showToast('Không tải được Hoi_thoai.xlsx — kiểm tra file có đúng tên, nằm cùng thư mục index.html.', 'error', 6000);
             }
 
             if ('speechSynthesis' in window) {
@@ -4863,6 +5253,7 @@
             setupFilterEvents();
             setupFlashcardEvents();
             setupWritingEvents();
+            setupQuickWritingVisibilityGuard();
             setupListeningEvents();
             setupTranslateEvents();
             setupQuizEvents();
@@ -4909,6 +5300,7 @@
         function switchMode(mode) {
             if (mode !== 'flashcard') stopAutoPlay();
             appState.activeMode = mode;
+            if (window.repositionSotaySelector) window.repositionSotaySelector();
 
             const exerciseModes = ['exercises', 'quiz', 'listening', 'translate', 'writing'];
             document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -4940,7 +5332,6 @@
             else if (mode === 'dictionary') renderDictionary();
             else if (mode === 'dialogue') renderDialogue();
             else if (mode === 'home') renderHome();
-            else if (mode === 'grammar') { switchMode('flashcard'); showToast('Tính năng Ngữ Pháp sắp ra mắt! 🚀', 'info'); }
         }
 
         function setupFilterEvents() {
@@ -4955,9 +5346,45 @@
                 panel.classList.add('hidden');
             }
 
+            // [FIX] Định vị lại panel mỗi lần mở, tránh tràn ra ngoài màn hình
+            // khi nút "HSK..." nằm sát mép phải (ví dụ: trên di động, khối này
+            // được JS chuyển vào cạnh nút cài đặt ⚙️ trong thanh công cụ Thẻ Nhớ).
+            function positionPanel() {
+                const panelWidth = panel.offsetWidth || 256; // w-64 ≈ 256px
+                const btnRect = btn.getBoundingClientRect();
+                const margin = 8;
+
+                // Reset về mặc định (mở sang phải, thẳng theo mép trái nút)
+                panel.style.left = '0px';
+                panel.style.right = 'auto';
+
+                // Nếu mở sang phải sẽ tràn khỏi màn hình -> mở ngược sang trái
+                if (btnRect.left + panelWidth > window.innerWidth - margin) {
+                    panel.style.left = 'auto';
+                    panel.style.right = '0px';
+                }
+
+                // Phòng trường hợp nút quá gần mép trái, mở sang trái cũng tràn
+                // -> ưu tiên giữ trong khung nhìn bằng cách kẹp lại theo mép phải màn hình
+                const rect = panel.getBoundingClientRect();
+                if (rect.left < margin) {
+                    panel.style.left = (margin - btnRect.left) + 'px';
+                    panel.style.right = 'auto';
+                } else if (rect.right > window.innerWidth - margin) {
+                    panel.style.right = (btnRect.right - (window.innerWidth - margin)) + 'px';
+                    panel.style.left = 'auto';
+                }
+            }
+
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                const willOpen = panel.classList.contains('hidden');
                 panel.classList.toggle('hidden');
+                if (willOpen) positionPanel();
+            });
+
+            window.addEventListener('resize', () => {
+                if (!panel.classList.contains('hidden')) positionPanel();
             });
 
             groupToggle.addEventListener('click', (e) => {
@@ -5237,9 +5664,13 @@
             return div.innerHTML;
         }
 
-        // Tên hiển thị khi chưa đăng nhập — lấy từ localStorage nếu người dùng đã từng đặt tên,
-        // mặc định là "Bạn"
+        // Tên hiển thị: ưu tiên tên tài khoản Google nếu đã đăng nhập (window.currentUser
+        // do firebase-sync.js cung cấp), nếu chưa đăng nhập thì lấy tên đã lưu trong
+        // localStorage (nếu có), mặc định là "Bạn".
         function getLocalDisplayName() {
+            if (window.currentUser && (window.currentUser.displayName || window.currentUser.email)) {
+                return window.currentUser.displayName || window.currentUser.email;
+            }
             return localStorage.getItem('zh_display_name') || 'Bạn';
         }
 
@@ -5305,6 +5736,12 @@
                 `;
             }).join('');
         }
+
+        // Expose ra window để firebase-sync.js có thể gọi khi đăng nhập xong
+        window.appState = appState;
+        window.updateSharedScoreDisplay = updateSharedScoreDisplay;
+        window.renderLeaderboard = renderLeaderboard;
+        window.updateStatsUI = updateStatsUI;
 
         // Số ngày học liên tục tính đến hôm nay (hoặc hôm qua nếu hôm nay chưa học)
         function computeStreak() {
@@ -5378,8 +5815,7 @@
                         : (score > 0 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'text-brand-400 hover:bg-brand-50')) +
                     (isToday && !isSelected ? ' ring-1 ring-brand-300' : '');
                 cell.innerHTML = day
-                    + (studiedBothToday ? '<span class="absolute -top-1 -right-1 text-[11px] leading-none">🫐</span>' : '')
-                    + (score > 0 && !isSelected ? '<span class="w-1 h-1 rounded-full bg-emerald-500 absolute bottom-0"></span>' : '');
+                    + (studiedBothToday ? '<img src="buom.png" alt="Đã học đủ" class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 object-contain pointer-events-none select-none">' : '');
                 cell.addEventListener('click', () => {
                     appState.homeSelectedDate = key;
                     renderHomeProgressCalendar();
@@ -5455,10 +5891,8 @@
             if (scoreEl) scoreEl.innerText = scoreSum;
 
             // Tổng cộng từ trước đến nay (không đổi theo kỳ)
-            const masteredTotalEl = document.getElementById('home-mastered-count');
-            const vocabTotalEl = document.getElementById('home-vocab-total');
-            if (masteredTotalEl) masteredTotalEl.innerText = appState.mastered.length;
-            if (vocabTotalEl) vocabTotalEl.innerText = appState.vocabulary.length;
+            const masteredTotalBoxEl = document.getElementById('home-mastered-total-box');
+            if (masteredTotalBoxEl) masteredTotalBoxEl.innerText = appState.mastered.length;
         }
 
         // Chuyển đổi hiển thị giữa Lịch (tab Ngày) và Biểu đồ cột (tab Tuần/Tháng/Năm)
@@ -5570,13 +6004,7 @@
             const card = e.target.closest('.home-card[data-mode], .home-start-btn[data-mode]');
             if (card) {
                 const mode = card.getAttribute('data-mode');
-                if (mode === 'grammar') {
-                    // Ngữ Pháp không phải 1 "mode" riêng mà là 1 khối modal có sẵn ở nút "Ngữ Pháp" trên thanh điều hướng
-                    const grammarBtn = document.getElementById('btn-open-grammar-modal');
-                    if (grammarBtn) grammarBtn.click();
-                } else if (mode) {
-                    switchMode(mode);
-                }
+                if (mode) switchMode(mode);
             }
         });
 
@@ -5803,6 +6231,8 @@
             });
 
             document.getElementById('btn-close-quick-writing').addEventListener('click', closeQuickWriting);
+            document.getElementById('btn-quick-writing-pause').addEventListener('click', toggleQuickWritingPause);
+            document.getElementById('btn-quick-writing-speed').addEventListener('click', cycleQuickWritingSpeed);
 
             // Click badge số trang để nhập trang muốn đến
             const seqBadge = document.getElementById('card-seq-badge');
@@ -5867,6 +6297,7 @@
                     recordMasteredChange(1);
                     updateStatsUI();
                 }
+                if (typeof window.syncUserDataToFirestore === 'function') window.syncUserDataToFirestore();
                 goToNextCardAfterMark();
             });
 
@@ -5884,6 +6315,7 @@
                     appState.unlearned.push(word.id);
                     localStorage.setItem('zh_unlearned', JSON.stringify(appState.unlearned));
                 }
+                if (typeof window.syncUserDataToFirestore === 'function') window.syncUserDataToFirestore();
                 goToNextCardAfterMark();
             });
 
@@ -5901,6 +6333,7 @@
                     appState.unknown.push(word.id);
                     localStorage.setItem('zh_unknown', JSON.stringify(appState.unknown));
                 }
+                if (typeof window.syncUserDataToFirestore === 'function') window.syncUserDataToFirestore();
                 goToNextCardAfterMark();
             });
         }
@@ -6069,11 +6502,62 @@
             playQuickWritingChar(chars[0]);
         }
 
+        // [NÉT CHỮ] Các mức tốc độ chạy tự động có thể chọn (nhân với tốc độ gốc).
+        // appState.quickWritingSpeedIndex trỏ vào mảng này, mặc định là mức "1x".
+        const QUICK_WRITING_SPEED_LEVELS = [0.5, 1];
+        const QUICK_WRITING_BASE_STROKE_SPEED = 1.1; // strokeAnimationSpeed gốc ở mức 1x
+        const QUICK_WRITING_BASE_STROKE_DELAY = 180;  // delayBetweenStrokes (ms) gốc ở mức 1x
+
+        function getQuickWritingSpeedMultiplier() {
+            return QUICK_WRITING_SPEED_LEVELS[appState.quickWritingSpeedIndex] || 1;
+        }
+
+        // Tạo object options tốc độ hiện tại để truyền vào animateCharacter() mỗi lượt —
+        // nhờ vậy đổi tốc độ áp dụng ngay từ nét/lượt animate tiếp theo, không cần tạo
+        // lại HanziWriter instance.
+        function getQuickWritingAnimateOptions() {
+            const mult = getQuickWritingSpeedMultiplier();
+            return {
+                strokeAnimationSpeed: QUICK_WRITING_BASE_STROKE_SPEED * mult,
+                delayBetweenStrokes: Math.max(30, Math.round(QUICK_WRITING_BASE_STROKE_DELAY / mult))
+            };
+        }
+
+        // Đổi mức tốc độ NGAY LẬP TỨC: huỷ lượt animate/đợi hiện tại rồi vẽ lại chữ hiện
+        // tại từ đầu bằng tốc độ mới, thay vì phải đợi viết xong hết chữ mới áp dụng.
+        function cycleQuickWritingSpeed() {
+            appState.quickWritingSpeedIndex = (appState.quickWritingSpeedIndex + 1) % QUICK_WRITING_SPEED_LEVELS.length;
+            updateQuickWritingSpeedBtn();
+
+            if (!appState.quickWriter) return;
+            if (appState.quickWritingTimer) {
+                clearTimeout(appState.quickWritingTimer);
+                appState.quickWritingTimer = null;
+            }
+            appState.quickWritingPaused = false;
+            appState.quickWritingPausedMidAnim = false;
+            updateQuickWritingPauseBtn();
+            playQuickWritingLoopTick();
+        }
+
+        function updateQuickWritingSpeedBtn() {
+            const btn = document.getElementById('btn-quick-writing-speed');
+            if (!btn) return;
+            const mult = getQuickWritingSpeedMultiplier();
+            btn.innerText = (mult % 1 === 0 ? mult : String(mult)) + 'x';
+        }
+
         function playQuickWritingChar(character) {
             if (appState.quickWritingTimer) {
                 clearTimeout(appState.quickWritingTimer);
                 appState.quickWritingTimer = null;
             }
+            appState.quickWritingPaused = false;
+            appState.quickWritingPausedMidAnim = false;
+            appState.quickWritingAutoPaused = false;
+            updateQuickWritingPauseBtn();
+            updateQuickWritingSpeedBtn();
+
             const holder = document.getElementById('quick-writing-holder');
             holder.innerHTML = '';
             const targetWidth = Math.min(220, window.innerWidth - 100);
@@ -6085,24 +6569,112 @@
                     height: targetWidth,
                     padding: 12,
                     showOutline: true,
-                    strokeAnimationSpeed: 1.1,
-                    delayBetweenStrokes: 180,
+                    strokeAnimationSpeed: QUICK_WRITING_BASE_STROKE_SPEED,
+                    delayBetweenStrokes: QUICK_WRITING_BASE_STROKE_DELAY,
                     strokeColor: '#0f766e',
                     radicalColor: '#dc2626',
                     outlineColor: '#cbd5e1'
                 });
 
-                const loop = () => {
-                    appState.quickWriter.animateCharacter({
-                        onComplete: () => {
-                            appState.quickWritingTimer = setTimeout(loop, 1500);
-                        }
-                    });
-                };
-                loop();
+                playQuickWritingLoopTick();
             } catch (err) {
                 console.error("Quick writing error:", err);
             }
+        }
+
+        // Chạy 1 lượt animate (dùng tốc độ hiện tại) rồi tự lặp lại sau 1.5s, trừ khi
+        // đang bị tạm dừng. Dùng chung cho cả lượt chạy đầu tiên lẫn khi tiếp tục sau
+        // khi tạm dừng ở khoảng nghỉ giữa 2 lượt.
+        //
+        // LƯU Ý QUAN TRỌNG: HanziWriter.animateCharacter() KHÔNG đọc strokeAnimationSpeed/
+        // delayBetweenStrokes truyền vào tham số của chính nó — thư viện chỉ dùng giá trị
+        // đã lưu nội bộ trong instance (được đặt lúc HanziWriter.create()). Vì vậy muốn đổi
+        // tốc độ có tác dụng thật, phải cập nhật thẳng vào instance (_options) trước khi
+        // gọi animateCharacter(), nếu không mọi mức tốc độ đều chạy y hệt tốc độ gốc.
+        function playQuickWritingLoopTick() {
+            if (appState.quickWritingPaused || !appState.quickWriter) return;
+            const opts = getQuickWritingAnimateOptions();
+            if (appState.quickWriter._options) {
+                appState.quickWriter._options.strokeAnimationSpeed = opts.strokeAnimationSpeed;
+                appState.quickWriter._options.delayBetweenStrokes = opts.delayBetweenStrokes;
+            }
+            appState.quickWriter.animateCharacter({
+                strokeAnimationSpeed: opts.strokeAnimationSpeed,
+                delayBetweenStrokes: opts.delayBetweenStrokes,
+                onComplete: () => {
+                    if (appState.quickWritingPaused) return;
+                    appState.quickWritingTimer = setTimeout(playQuickWritingLoopTick, 1500);
+                }
+            });
+        }
+
+        // [NÉT CHỮ] Tạm dừng / tiếp tục vòng lặp animate chữ tự động trong modal
+        // "Nét chữ". Nếu đang giữa lúc HanziWriter vẽ nét (chưa xong 1 lượt) thì dùng
+        // pauseAnimation()/resumeAnimation() có sẵn của thư viện để dừng/tiếp tục đúng
+        // ngay tại nét đang vẽ dở. Nếu đang trong khoảng nghỉ giữa 2 lượt lặp (đã vẽ
+        // xong, đang chờ setTimeout) thì chỉ cần huỷ/đặt lại timer.
+        function toggleQuickWritingPause() {
+            if (!appState.quickWriter) return;
+
+            if (!appState.quickWritingPaused) {
+                // Đang chạy -> chuyển sang tạm dừng
+                appState.quickWritingPaused = true;
+                if (appState.quickWritingTimer) {
+                    // Đang trong khoảng nghỉ giữa 2 lượt lặp -> chỉ cần huỷ timer chờ
+                    clearTimeout(appState.quickWritingTimer);
+                    appState.quickWritingTimer = null;
+                    appState.quickWritingPausedMidAnim = false;
+                } else {
+                    // Đang vẽ dở nét chữ -> tạm dừng đúng tại chỗ
+                    appState.quickWritingPausedMidAnim = true;
+                    try { appState.quickWriter.pauseAnimation(); } catch (e) {}
+                }
+            } else {
+                // Đang tạm dừng -> tiếp tục
+                appState.quickWritingPaused = false;
+                if (appState.quickWritingPausedMidAnim) {
+                    appState.quickWritingPausedMidAnim = false;
+                    try { appState.quickWriter.resumeAnimation(); } catch (e) {}
+                } else {
+                    // Đang ở khoảng nghỉ giữa 2 lượt lặp -> chạy lại lượt animate mới ngay
+                    playQuickWritingLoopTick();
+                }
+            }
+            updateQuickWritingPauseBtn();
+        }
+
+        function updateQuickWritingPauseBtn() {
+            const icon = document.getElementById('btn-quick-writing-pause-icon');
+            const btn = document.getElementById('btn-quick-writing-pause');
+            if (!icon || !btn) return;
+            if (appState.quickWritingPaused) {
+                icon.className = 'fa-solid fa-play text-sm';
+                btn.title = 'Tiếp tục chạy tự động';
+            } else {
+                icon.className = 'fa-solid fa-pause text-sm';
+                btn.title = 'Tạm dừng chạy tự động';
+            }
+        }
+
+        // [NÉT CHỮ] Khi tab/app bị ẩn đi (chuyển app khác, khoá màn hình, đổi tab...),
+        // trình duyệt tạm ngưng cập nhật thời gian animate (requestAnimationFrame) của
+        // HanziWriter. Khi quay lại, khoảng thời gian "nhảy vọt" đó khiến animation tính
+        // toán sai tiến độ và bỏ qua/nhảy cóc một số nét (đây là nguyên nhân chính gây ra
+        // hiện tượng chạy không ổn định / không vẽ hết nét). Để tránh việc này, tự động
+        // tạm dừng animate khi tab bị ẩn và khôi phục lại khi tab hiện ra trở lại.
+        function setupQuickWritingVisibilityGuard() {
+            document.addEventListener('visibilitychange', () => {
+                if (!appState.quickWriter) return;
+                if (document.hidden) {
+                    if (!appState.quickWritingPaused) {
+                        appState.quickWritingAutoPaused = true;
+                        toggleQuickWritingPause();
+                    }
+                } else if (appState.quickWritingAutoPaused) {
+                    appState.quickWritingAutoPaused = false;
+                    toggleQuickWritingPause();
+                }
+            });
         }
 
         function closeQuickWriting() {
@@ -6111,6 +6683,10 @@
                 appState.quickWritingTimer = null;
             }
             appState.quickWriter = null;
+            appState.quickWritingPaused = false;
+            appState.quickWritingPausedMidAnim = false;
+            appState.quickWritingAutoPaused = false;
+            updateQuickWritingPauseBtn();
             document.getElementById('quick-writing-holder').innerHTML = '';
             document.getElementById('quick-writing-modal').classList.add('hidden');
         }
@@ -6171,7 +6747,7 @@
         // Tách một câu tiếng Trung thành các từ dựa trên từ điển từ vựng đã có trong app
         // (khớp dài nhất trước - greedy maximum matching), phần còn lại tách theo từng ký tự.
         function tokenizeChineseSentence(text, dict) {
-            const cleaned = (text || '').replace(/[，。！？、,.!?~～\s]/g, '');
+            const cleaned = (text || '').replace(/[，。！？、,.!?~～：:；;“”‘’"'（）()《》【】\s]/g, '');
             const tokens = [];
             const maxLen = 5;
             let i = 0;
@@ -6192,9 +6768,23 @@
         }
 
         // Sinh bộ câu Sắp Xếp Câu từ chính câu ví dụ của các từ vựng trong giáo trình/cấp độ đang chọn
+        // [HIỆU NĂNG] Cache lại tập hợp Hán tự (dict) dùng để tokenize câu ví dụ.
+        // Chỉ dựng lại khi số lượng từ vựng thay đổi (thêm từ mới/nhập Excel),
+        // tránh việc renderWritingPractice() (chạy mỗi khi bấm "Câu tiếp theo")
+        // phải quét lại toàn bộ appState.vocabulary mỗi lần.
+        let _vocabDictCache = null;
+        let _vocabDictCacheLen = -1;
+        function getVocabDict() {
+            if (!_vocabDictCache || _vocabDictCacheLen !== appState.vocabulary.length) {
+                _vocabDictCache = new Set();
+                appState.vocabulary.forEach(v => { if (v.hanzi) _vocabDictCache.add(v.hanzi); });
+                _vocabDictCacheLen = appState.vocabulary.length;
+            }
+            return _vocabDictCache;
+        }
+
         function generateSentencePool() {
-            const dict = new Set();
-            appState.vocabulary.forEach(v => { if (v.hanzi) dict.add(v.hanzi); });
+            const dict = getVocabDict();
 
             const seen = new Set();
             const pool = [];
@@ -6219,6 +6809,8 @@
             const answerZone = document.getElementById('so-answer-zone');
             const poolZone = document.getElementById('so-pool-zone');
             const placeholder = document.getElementById('so-answer-placeholder');
+            const checkBtn = document.getElementById('soCheck');
+            if (checkBtn) checkBtn.disabled = appState.soAnswer.length === 0;
 
             answerZone.querySelectorAll('.so-token-btn').forEach(el => el.remove());
             poolZone.innerHTML = '';
@@ -6266,7 +6858,6 @@
                 userTokens.every((t, i) => t === sentence.tokens[i]);
 
             appState.soChecked = true;
-            appState.soTotal++;
 
             const feedback = document.getElementById('so-feedback');
             feedback.classList.remove('hidden');
@@ -6274,6 +6865,7 @@
             document.getElementById('soNext').classList.remove('hidden');
 
             if (isCorrect) {
+                appState.soTotal++;
                 const soKey = sentence.tokens.join('');
                 const soGained = awardCorrectScore('sentence-order', soKey);
                 feedback.className = "w-full p-3.5 rounded-xl font-bold text-sm text-center bg-emerald-100 text-emerald-900 border border-emerald-300";
@@ -6379,11 +6971,10 @@
             const feedback = document.getElementById('listening-feedback');
             feedback.classList.remove('hidden');
 
-            appState.listeningTotal++;
-
             if (selectedMeaning === correctMeaning) {
+                appState.listeningTotal++;
                 btnEl.className = "p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-100 text-emerald-950 font-bold text-base shadow-sm flex items-center justify-between";
-                const listeningGained = awardCorrectScore('listening', targetWord.hanzi);
+                const listeningGained = awardCorrectScore('listening', appState.currentListeningQuestion.hanzi);
                 const okIcon = btnEl.querySelector('i');
                 if (okIcon) okIcon.outerHTML = `<span class="text-emerald-600 font-bold text-sm">+${listeningGained}</span>`;
 
@@ -6493,9 +7084,8 @@
             const feedback = document.getElementById('translate-feedback');
             feedback.classList.remove('hidden');
 
-            appState.translateTotal++;
-
             if (userAnswer === correctAnswer) {
+                appState.translateTotal++;
                 input.className = "w-full text-center text-2xl font-hanzi font-bold border-2 border-emerald-500 bg-emerald-50 text-emerald-900 focus:outline-none rounded-2xl px-4 py-3 transition placeholder:text-sm placeholder:font-sans placeholder:font-normal placeholder:text-slate-400";
                 const translateGained = awardCorrectScore('translate', targetWord.hanzi);
                 feedback.className = "w-full p-3.5 rounded-xl font-bold text-sm transition text-center bg-emerald-100 text-emerald-800";
@@ -6661,12 +7251,17 @@
             feedback.classList.remove('hidden');
 
             if (selectedMeaning === correctMeaning) {
+                appState.quizTotal++;
                 btnEl.className = "p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-100 text-emerald-950 font-bold text-base shadow-sm flex items-center justify-between";
                 const quizGained = awardCorrectScore('quiz', appState.currentQuizQuestion ? appState.currentQuizQuestion.hanzi : correctMeaning);
                 const okIcon = btnEl.querySelector('i');
                 if (okIcon) okIcon.outerHTML = `<span class="text-emerald-600 font-bold text-sm">+${quizGained}</span>`;
 
                 feedback.classList.add('hidden');
+
+                if (appState.quizTotal % 5 === 0) {
+                    confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+                }
             } else {
                 btnEl.className = "p-4 rounded-2xl border-2 border-rose-400 bg-rose-100 text-rose-950 font-bold text-base shadow-sm flex items-center justify-between";
 
@@ -6761,7 +7356,7 @@
                             </button>
                         `).join('');
                 } else if (activeScope === 'sentence') {
-                    // [Mẫu câu] Duyệt toàn bộ appState.vocabulary (đã gộp Ví dụ câu/Pinyin câu/Nghĩa câu
+                    // [Mẫu câu] Duyệt toàn bộ appState.vocabulary (đã gộp Ví dụ câu/Phiên âm câu/Nghĩa câu
                     // từ MỌI sheet trong Tu vung.xlsx lúc tải app — xem loadVocabularyFromExcel()),
                     // lọc ra các câu ví dụ có chứa từ khoá đang gõ, tránh trùng câu.
                     const seen = new Set();
@@ -6952,23 +7547,28 @@
                 appState.favorites.push(id);
             }
             localStorage.setItem('zh_favs', JSON.stringify(appState.favorites));
+            if (typeof window.syncUserDataToFirestore === 'function') window.syncUserDataToFirestore();
             renderDictionary(document.getElementById('dict-search-input').value);
         };
 
         function setupSettingsModalEvents() {
             const modal = document.getElementById('settings-modal');
 
-            // Hán tự / Pinyin / Hán Việt / Nghĩa: mỗi trường chọn qua dropdown Mặt trước / Mặt sau / Cả hai
+            // Hán tự / Phiên âm / Hán Việt & Loại từ / Nghĩa: mỗi trường (hoặc nhóm trường,
+            // vd "hanviet,wordtype" đi chung 1 dropdown) chọn qua Mặt trước / Mặt sau / Cả hai
             const fieldSelects = document.querySelectorAll('.field-side-select');
             function updateFieldSideUI() {
                 fieldSelects.forEach(sel => {
-                    sel.value = appState.cardFieldsVisible[sel.dataset.field];
+                    const firstField = sel.dataset.field.split(',')[0];
+                    sel.value = appState.cardFieldsVisible[firstField];
                 });
             }
             updateFieldSideUI();
             fieldSelects.forEach(sel => {
                 sel.addEventListener('change', () => {
-                    appState.cardFieldsVisible[sel.dataset.field] = sel.value;
+                    sel.dataset.field.split(',').forEach(field => {
+                        appState.cardFieldsVisible[field] = sel.value;
+                    });
                     localStorage.setItem('zh_card_fields', JSON.stringify(appState.cardFieldsVisible));
                     updateFieldSideUI();
                     renderFlashcard();
@@ -7190,56 +7790,16 @@
 <!-- ═══════════════════════════════════════════════════════════════════
      [MODULE RIÊNG: NGỮ PHÁP] Đây là 1 khối tự lập (layout + CSS + JS
      riêng, ít dùng chung class Tailwind như phần trên). Gồm:
-       - Bố cục (HTML) ngay dưới đây: khung modal, thanh tìm kiếm, nav
-       - Chức năng (JS) ở khối script bắt đầu vài trăm dòng dưới,
-         chứa toàn bộ dữ liệu ngữ pháp HSK/Boya và logic hiển thị/tìm.
+       - Bố cục (HTML): section #mode-grammar, đã dời lên nằm cùng các
+         section study-mode khác (Thẻ Nhớ, Bài Tập...) bên trong
+         #view-container, để hiển thị đồng nhất với các khối đó thay vì
+         là 1 modal nổi riêng.
+       - Chức năng (JS) ở khối script ngay dưới đây, chứa toàn bộ dữ
+         liệu ngữ pháp HSK/Boya và logic hiển thị/tìm — vẫn để nguyên vị
+         trí này, không cần dời theo vì script không phụ thuộc vị trí.
      Muốn chỉnh riêng phần "Ngữ pháp" thì tìm trong khối này, đừng lẫn
      với phần flashcard/quiz chính ở trên.
      ═══════════════════════════════════════════════════════════════════ -->
-<!-- ===== GRAMMAR MODAL (bố cục) ===== -->
-<div id="grammar-modal-overlay">
-    <button id="grammar-close-btn" title="Đóng Ngữ pháp">✕</button>
-    <div id="grammar-modal-inner">
-
-
-<header>
-  <div class="hz-watermark">語法</div>
-  <div class="eyebrow">Kho ngữ pháp · Hán ngữ</div>
-  <div class="source-tags" id="curriculumSwitcher">
-    <button type="button" class="source-tag curriculum-btn" data-curriculum="boya"><b>Giáo trình Boya</b></button>
-    <button type="button" class="source-tag curriculum-btn active" data-curriculum="yufa"><b>Giáo trình HSK chuẩn</b></button>
-    <button type="button" class="source-tag curriculum-btn" data-curriculum="custom"><b>✎ Tự nhập</b></button>
-  </div>
-</header>
-
-<div class="control-bar">
-  <div class="search-wrap">
-    <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke-width="2" stroke-linecap="round"/></svg>
-    <input id="searchInput" type="text" placeholder="Tìm ngữ pháp: 把, 被, so sánh, bổ ngữ...">
-  </div>
-  <div class="level-nav" id="levelNav"></div>
-  <div class="lesson-nav" id="lessonNav" style="display:none;"></div>
-</div>
-
-<div class="import-panel-wrap" id="importPanel" style="display:none;">
-  <div class="import-panel">
-    <div>
-      <h3>✎ Tự nhập điểm ngữ pháp</h3>
-      <p>Nhập file Excel (.xlsx) với các cột: <code>Tiêu đề</code>, <code>Cấu trúc</code>, <code>Tóm tắt</code>, <code>Giải thích</code>, <code>Ví dụ Trung 1</code>, <code>Ví dụ Pinyin 1</code>, <code>Ví dụ Nghĩa 1</code>, <code>Ví dụ Trung 2</code>, <code>Ví dụ Pinyin 2</code>, <code>Ví dụ Nghĩa 2</code>, <code>Lưu ý</code>, <code>Tham chiếu</code>. Mỗi dòng là một điểm ngữ pháp, hiển thị theo đúng mẫu thẻ đang dùng trong trang.</p>
-      <div class="import-msg" id="importMsg"></div>
-    </div>
-    <div class="import-actions">
-      <button type="button" class="import-btn" id="btnImportExcel">📥 Nhập file Excel</button>
-      <input type="file" id="importFileInput" accept=".xlsx,.xls" style="display:none;">
-      <button type="button" class="import-btn ghost" id="btnDownloadTemplate">⬇️ Tải file mẫu</button>
-      <button type="button" class="import-btn ghost" id="btnClearCustom">🗑 Xóa hết mục tự nhập</button>
-    </div>
-  </div>
-</div>
-
-<main id="mainContent"></main>
-
-<footer>坚持就是胜利 · Kiên trì chính là chiến thắng — mỗi điểm ngữ pháp bạn học hôm nay là một bước tiến gần hơn đến trình độ HSK mơ ước. Cố lên nhé! 加油！</footer>
 
 <!-- ===== GRAMMAR MODAL (chức năng: dữ liệu + logic JS) ===== -->
 <script>
@@ -8082,8 +8642,8 @@ function buildCustomData(){
    File YUFA.xlsx cần đặt CÙNG THƯ MỤC với index.html. Mỗi sheet trong file
    (VD: HSK1, HSK2, HSK3, ...) sẽ tự động biến thành một khối trình độ riêng,
    dùng chung định dạng cột như file mẫu Boya/HSK chuẩn:
-   Bài, Tiêu đề, Cấu trúc, Tóm tắt, Giải thích, Ví dụ Trung 1, Ví dụ Pinyin 1,
-   Ví dụ Nghĩa 1, Ví dụ Trung 2, Ví dụ Pinyin 2, Ví dụ Nghĩa 2, Lưu ý, Tham chiếu.
+   Bài, Tiêu đề, Cấu trúc, Tóm tắt, Giải thích, Ví dụ Trung 1, Ví dụ Phiên âm 1,
+   Ví dụ Nghĩa 1, Ví dụ Trung 2, Ví dụ Phiên âm 2, Ví dụ Nghĩa 2, Lưu ý, Tham chiếu.
    Cột "Bài" có thể có (kiểu HSK) hoặc không có (kiểu Boya) — cả hai đều đọc được. */
 function parseYufaSheet(sheetName, rows){
   if(!rows || !rows.length) return null;
@@ -8100,10 +8660,10 @@ function parseYufaSheet(sheetName, rows){
     if(!kBrief   && (n==='tomtat' || n==='brief'))                    kBrief = k;
     if(!kExplain && (n==='giaithich' || n==='explain'))               kExplain = k;
     if(!kExCn1   && (n==='vidutrung1' || n==='examplecn1' || n==='vidutrung' || n==='examplecn'))       kExCn1 = k;
-    if(!kExPy1   && (n==='vidupinyin1' || n==='examplepinyin1' || n==='vidupinyin' || n==='examplepinyin')) kExPy1 = k;
+    if(!kExPy1   && (n==='vidupinyin1' || n==='examplepinyin1' || n==='vidupinyin' || n==='examplepinyin' || n==='viduphienam1' || n==='examplephienam1' || n==='viduphienam' || n==='examplephienam')) kExPy1 = k;
     if(!kExVn1   && (n==='vidunghia1' || n==='examplevn1' || n==='vidunghia' || n==='examplevn'))       kExVn1 = k;
     if(!kExCn2   && (n==='vidutrung2' || n==='examplecn2'))           kExCn2 = k;
-    if(!kExPy2   && (n==='vidupinyin2' || n==='examplepinyin2'))      kExPy2 = k;
+    if(!kExPy2   && (n==='vidupinyin2' || n==='examplepinyin2' || n==='viduphienam2' || n==='examplephienam2'))      kExPy2 = k;
     if(!kExVn2   && (n==='vidunghia2' || n==='examplevn2'))           kExVn2 = k;
     if(!kNote    && (n==='luuy' || n==='note'))                       kNote = k;
     if(!kRefs    && (n==='thamchieu' || n==='refs'))                  kRefs = k;
@@ -8504,10 +9064,10 @@ function importCustomRows(rows){
     if(!kBrief   && (n==='tomtat' || n==='brief'))                    kBrief = k;
     if(!kExplain && (n==='giaithich' || n==='explain'))               kExplain = k;
     if(!kExCn1   && (n==='vidutrung1' || n==='examplecn1' || n==='vidutrung' || n==='examplecn'))       kExCn1 = k;
-    if(!kExPy1   && (n==='vidupinyin1' || n==='examplepinyin1' || n==='vidupinyin' || n==='examplepinyin')) kExPy1 = k;
+    if(!kExPy1   && (n==='vidupinyin1' || n==='examplepinyin1' || n==='vidupinyin' || n==='examplepinyin' || n==='viduphienam1' || n==='examplephienam1' || n==='viduphienam' || n==='examplephienam')) kExPy1 = k;
     if(!kExVn1   && (n==='vidunghia1' || n==='examplevn1' || n==='vidunghia' || n==='examplevn'))       kExVn1 = k;
     if(!kExCn2   && (n==='vidutrung2' || n==='examplecn2'))           kExCn2 = k;
-    if(!kExPy2   && (n==='vidupinyin2' || n==='examplepinyin2'))      kExPy2 = k;
+    if(!kExPy2   && (n==='vidupinyin2' || n==='examplepinyin2' || n==='viduphienam2' || n==='examplephienam2'))      kExPy2 = k;
     if(!kExVn2   && (n==='vidunghia2' || n==='examplevn2'))           kExVn2 = k;
     if(!kNote    && (n==='luuy' || n==='note'))                       kNote = k;
     if(!kRefs    && (n==='thamchieu' || n==='refs'))                   kRefs = k;
@@ -8553,7 +9113,7 @@ function importCustomRows(rows){
 
 document.getElementById('btnDownloadTemplate').addEventListener('click', ()=>{
   const wsData = [
-    ['Tiêu đề','Cấu trúc','Tóm tắt','Giải thích','Ví dụ Trung 1','Ví dụ Pinyin 1','Ví dụ Nghĩa 1','Ví dụ Trung 2','Ví dụ Pinyin 2','Ví dụ Nghĩa 2','Lưu ý','Tham chiếu'],
+    ['Tiêu đề','Cấu trúc','Tóm tắt','Giải thích','Ví dụ Trung 1','Ví dụ Phiên âm 1','Ví dụ Nghĩa 1','Ví dụ Trung 2','Ví dụ Phiên âm 2','Ví dụ Nghĩa 2','Lưu ý','Tham chiếu'],
     ['把 — câu chữ 把 cơ bản','S + 把 + O + V + Bổ ngữ','Đưa tân ngữ lên trước động từ để nhấn mạnh sự xử lý/tác động lên nó.',
      'Dùng khi cần nhấn mạnh kết quả xử lý một sự vật cụ thể, xác định. Không dùng với động từ không có tính xử lý.',
      '请把门关上。','Qǐng bǎ mén guānshàng.','Xin hãy đóng cửa lại.',
@@ -8590,9 +9150,6 @@ if(activeCurriculum === 'yufa' && !yufaLoaded){
 }
 </script>
 
-    </div>
-</div>
-
 <!-- ═══════════════════════════════════════════════════════════════════
      [CHỨC NĂNG - ĐỔI THEME] Không phải nơi định nghĩa MÀU, chỉ là logic
      BẤM NÚT NÀO THÌ GÁN data-theme="..." vào thẻ <html>. Màu thật sự
@@ -8606,6 +9163,17 @@ if(activeCurriculum === 'yufa' && !yufaLoaded){
     var THEME_KEY = 'lanmei-theme';
     var THEMES = ['meigui', 'mudan', 'baihe', 'huangju', 'mint', 'default', 'lotus', 'xunyicao'];
 
+    var HERO_IMAGES = {
+        'meigui':   'nu trang.png',
+        'mudan':    'nu do.png',
+        'baihe':    'nu cam.png',
+        'huangju':  'nu vang.png',
+        'mint':     'nu xanh.png',
+        'xunyicao': 'nu tim.png',
+        'lotus':    'nu hong.png',
+        'default':  'nu lam.png'
+    };
+
     function applyTheme(theme) {
         if (theme === 'default') {
             document.documentElement.removeAttribute('data-theme');
@@ -8616,6 +9184,12 @@ if(activeCurriculum === 'yufa' && !yufaLoaded){
         document.querySelectorAll('.theme-option').forEach(function(el) {
             el.classList.toggle('active', el.dataset.theme === theme);
         });
+        // Cập nhật hình hero theo theme (JS thay vì CSS content:url() để hỗ trợ Safari/iOS)
+        var heroImg = document.getElementById('hero-image');
+        if (heroImg) {
+            heroImg.style.display = '';
+            heroImg.src = HERO_IMAGES[theme] || 'hinhtrangchu.png';
+        }
     }
 
     var btn = document.getElementById('theme-toggle-btn');
@@ -8732,34 +9306,242 @@ if(activeCurriculum === 'yufa' && !yufaLoaded){
 </script>
 
 <script>
-// Grammar Modal Open/Close
+// [SỔ TAY - MOBILE] Trên điện thoại (< md), di chuyển khối chọn Sổ tay
+// (HSK 1, HSK 2...) từ thanh filter phía trên xuống nằm ở 1 trong 2 khe chứa
+// di động tuỳ theo màn đang mở:
+//   - Đang ở Thẻ Nhớ  → nằm ngay bên phải nút cài đặt (bánh răng ⚙️)
+//   - Đang ở màn hub Bài Tập (trước khi chọn Trắc Nghiệm/Nghe/Dịch/Sắp Xếp Câu)
+//     → nằm dưới tiêu đề "📝 Bài Tập"
+// Các màn khác (Trang chủ, Tra Từ, Hội Thoại, hoặc bên trong 1 bài tập cụ
+// thể) không cần khối này nên nó tạm "đỗ" ở khe Thẻ Nhớ (ẩn, không tốn diện
+// tích) cho tới khi người dùng quay lại 1 trong 2 màn trên.
+// Trên desktop (>= md) luôn trả nó về vị trí cũ trong thanh filter
+// (#top-filter-bar).
 (function() {
-    var triggers = document.querySelectorAll('.btn-open-grammar-modal-trigger');
-    var overlay = document.getElementById('grammar-modal-overlay');
-    if (!triggers.length || !overlay) return;
-    triggers.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            overlay.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        });
-    });
-    document.getElementById('grammar-close-btn').addEventListener('click', function() {
-        overlay.classList.remove('active');
-        document.body.style.overflow = '';
-    });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && overlay.classList.contains('active')) {
-            overlay.classList.remove('active');
-            document.body.style.overflow = '';
+    var block = document.getElementById('sotay-selector-block');
+    var flashcardSlot = document.getElementById('flashcard-mobile-sotay-slot');
+    var exercisesSlot = document.getElementById('exercises-mobile-sotay-slot');
+    var desktopParent = document.getElementById('top-filter-bar');
+    if (!block || !flashcardSlot || !exercisesSlot || !desktopParent) return;
+
+    var mq = window.matchMedia('(max-width: 767px)');
+
+    function position() {
+        if (mq.matches) {
+            var mode = (typeof appState !== 'undefined' && appState) ? appState.activeMode : null;
+            var target = (mode === 'exercises') ? exercisesSlot : flashcardSlot;
+            if (block.parentElement !== target) target.appendChild(block);
+        } else {
+            if (block.parentElement !== desktopParent) desktopParent.appendChild(block);
         }
-    });
+    }
+
+    position();
+    if (mq.addEventListener) {
+        mq.addEventListener('change', position);
+    } else if (mq.addListener) {
+        mq.addListener(position); // Safari cũ
+    }
+    window.addEventListener('orientationchange', position);
+    // Cho phép switchMode() gọi lại mỗi khi đổi màn, để khối Sổ tay theo
+    // đúng màn đang mở (Thẻ Nhớ hay hub Bài Tập) trên di động.
+    window.repositionSotaySelector = position;
+})();
+</script>
+
+<script>
+// [HỘI THOẠI - DESKTOP] Trên màn hình rộng (>= md), di chuyển khối chọn
+// "HSK.../Bài..." của Hội Thoại từ hàng tiêu đề trong màn hình lên nằm
+// trong thanh điều hướng trên cùng (#dialogue-desktop-selector-slot), ngay
+// chỗ khối "Sổ tay" vừa được ẩn đi khi ở Hội Thoại. Trên di động, hoặc khi
+// không ở chế độ Hội Thoại, trả nó về đúng vị trí ban đầu.
+(function() {
+    var group = document.getElementById('dialogue-selector-group');
+    var desktopSlot = document.getElementById('dialogue-desktop-selector-slot');
+    var dialogueSection = document.getElementById('mode-dialogue');
+    if (!group || !desktopSlot || !dialogueSection) return;
+
+    var originalParent = group.parentElement;
+    var originalNextSibling = group.nextSibling;
+    var mq = window.matchMedia('(min-width: 768px)');
+
+    function isDialogueActive() {
+        return !dialogueSection.classList.contains('hidden');
+    }
+
+    function position() {
+        if (mq.matches && isDialogueActive()) {
+            if (group.parentElement !== desktopSlot) desktopSlot.appendChild(group);
+        } else if (group.parentElement !== originalParent) {
+            if (originalNextSibling && originalNextSibling.parentElement === originalParent) {
+                originalParent.insertBefore(group, originalNextSibling);
+            } else {
+                originalParent.appendChild(group);
+            }
+        }
+    }
+
+    position();
+    if (mq.addEventListener) {
+        mq.addEventListener('change', position);
+    } else if (mq.addListener) {
+        mq.addListener(position);
+    }
+    new MutationObserver(position).observe(dialogueSection, { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('orientationchange', position);
+})();
+</script>
+
+<script>
+// [HỘI THOẠI - STICKY MOBILE] Đồng bộ động vị trí "top" của khối sticky
+// (tiêu đề + chọn HSK/Bài + tab con) theo ĐÚNG chiều cao thực tế của header
+// chính, thay vì số cố định (5rem) — tránh bị hở/lệch hoặc mất dính nếu
+// header co giãn chiều cao khác nhau trên từng thiết bị.
+(function() {
+    var bar = document.getElementById('dialogue-sticky-bar');
+    var header = document.querySelector('header');
+    if (!bar || !header) return;
+
+    function syncTop() {
+        bar.style.top = header.getBoundingClientRect().height + 'px';
+    }
+
+    syncTop();
+    window.addEventListener('resize', syncTop);
+    window.addEventListener('orientationchange', syncTop);
+    new ResizeObserver(syncTop).observe(header);
 })();
 </script>
 
 </div><!-- /#app-root -->
 
-<!-- ĐÃ TẠM VÔ HIỆU HOÁ: firebase-sync.js (thiếu file, gây treo màn hình loading). Thêm lại file này và bỏ comment dòng dưới khi muốn bật lại đăng nhập. -->
-<!-- <script src="firebase-sync.js"></script> -->
+<!-- Đăng nhập Google (tùy chọn) + đồng bộ dữ liệu học lên Firestore theo tài khoản -->
+<script src="firebase-sync.js"></script>
+
+<script>
+// [CÀI ĐẶT] Panel cài đặt: chỉnh cỡ chữ + đăng nhập Google
+(function () {
+    // ── Cỡ chữ ──────────────────────────────────────────────
+    var SIZES = { small: '14px', medium: '16px', large: '19px' };
+    var FONT_KEY = 'zh_font_size';
+
+    function applySize(size) {
+        // Chỉ áp font-size lên vùng nội dung, KHÔNG áp lên <html>
+        // để layout nền (padding, gap, height) không bị thay đổi theo rem
+        var target = document.getElementById('view-container') || document.documentElement;
+        target.style.fontSize = SIZES[size] || SIZES.medium;
+        document.querySelectorAll('.font-size-option').forEach(function (btn) {
+            var active = btn.getAttribute('data-size') === size;
+            btn.classList.toggle('bg-brand-500', active);
+            btn.classList.toggle('text-white', active);
+            btn.classList.toggle('border-brand-500', active);
+            btn.classList.toggle('font-extrabold', active);
+        });
+    }
+
+    // Áp dụng ngay khi load
+    applySize(localStorage.getItem(FONT_KEY) || 'medium');
+
+    // ── Panel mở/đóng + sự kiện ─────────────────────────────
+    document.addEventListener('DOMContentLoaded', init);
+    if (document.readyState !== 'loading') init();
+
+    function init() {
+        var btn   = document.getElementById('settings-btn');
+        var panel = document.getElementById('settings-panel');
+        if (!btn || !panel) return;
+
+        applySize(localStorage.getItem(FONT_KEY) || 'medium');
+
+        // Mở/đóng panel, định vị fixed theo toạ độ nút
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isHidden = panel.classList.contains('hidden');
+            panel.classList.toggle('hidden');
+            if (isHidden) {
+                var rect = btn.getBoundingClientRect();
+                // Mở về bên phải nút; nếu tràn màn hình thì đẩy sang trái
+                var left = rect.left;
+                if (left + 210 > window.innerWidth) left = rect.right - 210;
+                panel.style.top  = (rect.bottom + 6) + 'px';
+                panel.style.left = Math.max(8, left) + 'px';
+            }
+        });
+
+        // Chọn cỡ chữ — panel KHÔNG đóng, người dùng thấy active ngay
+        panel.querySelectorAll('.font-size-option').forEach(function (opt) {
+            opt.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var size = opt.getAttribute('data-size');
+                localStorage.setItem(FONT_KEY, size);
+                applySize(size);
+            });
+        });
+
+        // Click ngoài đóng panel
+        document.addEventListener('click', function () {
+            panel.classList.add('hidden');
+        });
+
+        // ── Google Login ──────────────────────────────────────
+        var loginBtn  = document.getElementById('settings-google-login-btn');
+        var logoutBtn = document.getElementById('settings-logout-btn');
+        var loginArea = document.getElementById('settings-login-area');
+        var userArea  = document.getElementById('settings-user-area');
+        var avatarEl  = document.getElementById('settings-user-avatar');
+        var nameEl    = document.getElementById('settings-user-name');
+
+        function updateAuthUI(user) {
+            if (user) {
+                loginArea.classList.add('hidden');
+                userArea.classList.remove('hidden');
+                userArea.classList.add('flex');
+                avatarEl.src  = user.photoURL || '';
+                nameEl.textContent = user.displayName || user.email || '';
+            } else {
+                loginArea.classList.remove('hidden');
+                userArea.classList.add('hidden');
+                userArea.classList.remove('flex');
+            }
+        }
+
+        // Lắng nghe trạng thái auth Firebase (nếu firebase-sync.js đã load)
+        if (typeof firebase !== 'undefined' && firebase.auth) {
+            firebase.auth().onAuthStateChanged(updateAuthUI);
+
+            if (loginBtn) {
+                loginBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    var provider = new firebase.auth.GoogleAuthProvider();
+                    firebase.auth().signInWithPopup(provider).catch(function(err) {
+                        console.warn('Login error:', err.message);
+                    });
+                });
+            }
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    firebase.auth().signOut();
+                    panel.classList.add('hidden');
+                });
+            }
+        } else {
+            // Firebase chưa sẵn — giữ nguyên nút login, hiện thông báo nhỏ
+            if (loginBtn) {
+                loginBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    loginBtn.textContent = '⚠️ Chưa kết nối Firebase';
+                    loginBtn.disabled = true;
+                    setTimeout(function() {
+                        loginBtn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-4 h-4"> Đăng nhập bằng Gmail';
+                        loginBtn.disabled = false;
+                    }, 2500);
+                });
+            }
+        }
+    }
+})();
+</script>
 
 </body>
 </html>
